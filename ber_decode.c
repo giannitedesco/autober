@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <stdint.h>
-#include "gber.h"
+#include <gber.h>
 
 const char * const ber_id_octet_clsname(uint8_t id)
 {

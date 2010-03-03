@@ -11,7 +11,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
-#include "gber.h"
+#include <gber.h>
 
 static const char *cmd;
 static const char *sys_err(void)
