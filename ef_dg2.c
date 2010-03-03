@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
-
+#include <assert.h>
 #include <gber.h>
 #include <autober.h>
 #include "bio_group.h"
@@ -38,6 +38,62 @@ static int mapfile(int fd, const uint8_t **begin, size_t *sz)
 	return 1;
 }
 
+void hex_dump(const uint8_t *tmp, size_t len, size_t llen)
+{
+	size_t i, j;
+	size_t line;
+
+	for(j = 0; j < len; j += line, tmp += line) {
+		if ( j + llen > len ) {
+			line = len - j;
+		}else{
+			line = llen;
+		}
+
+		printf("%05x : ", j);
+
+		for(i = 0; i < line; i++) {
+			if ( isprint(tmp[i]) ) {
+				printf("%c", tmp[i]);
+			}else{
+				printf(".");
+			}
+		}
+
+		for(; i < llen; i++)
+			printf(" ");
+
+		for(i = 0; i < line; i++)
+			printf(" %02x", tmp[i]);
+
+		printf("\n");
+	}
+	printf("\n");
+}
+
+static void print_bio_group(struct bio_group *bg)
+{
+	unsigned int i;
+
+	assert(bg->num_instances == bg->_bio_inf_count);
+
+	printf("bio_group.num_instances = %u\n", bg->num_instances);
+	for(i = 0; i < bg->num_instances; i++) {
+		struct bio_inf *bi;
+
+		bi = bg->bio_inf + i;
+		printf("bio_inf[i].hdr.vers = 0x%.4x\n",
+			bi->bio_hdr.vers);
+		printf("bio_inf[i].hdr.format_owner = 0x%.4x\n",
+			(bi->bio_hdr.format_owner[0] << 8) |
+			bi->bio_hdr.format_owner[1]);
+		printf("bio_inf[i].hdr.format_type = 0x%.4x\n",
+			(bi->bio_hdr.format_type[0] << 8) |
+			bi->bio_hdr.format_type[1]);
+		hex_dump(bi->bdb.bdb_nc.ptr, bi->bdb.bdb_nc.len, 16);
+	}
+}
+
 static int parse_dg2(const uint8_t *ptr, size_t len)
 {
 	struct bio_group *bio;
@@ -55,6 +111,8 @@ static int parse_dg2(const uint8_t *ptr, size_t len)
 	bio = bio_group_decode(ptr, tag.ber_len);
 	if ( NULL == bio )
 		return 0;
+
+	print_bio_group(bio);
 
 	bio_group_free(bio);
 	return 1;

@@ -16,6 +16,9 @@
 #define TAG_BIO_INF_BDB_NC			0x5f2e
 #define TAG_BIO_INF_BDB_C			0x7f2e
 
+#define BIO_INF_BDB_TYPE_BDB_NC			0
+#define BIO_INF_BDB_TYPE_BDB_C			1
+
 #define TAG_BIO_HDR_VERS			0x80
 #define TAG_BIO_HDR_TYPE			0x81
 #define TAG_BIO_HDR_SUBTYPE			0x82
@@ -34,11 +37,12 @@
 struct bio_group {
 	uint8_t num_instances;
 	struct bio_inf *bio_inf;
+	unsigned int _bio_inf_count;
 };
 
 struct bio_inf {
 	struct bio_hdr {
-		uint8_t vers;
+		uint16_t vers;
 		uint8_t type[3];
 		size_t _type_len;
 		uint8_t subtype;
@@ -49,6 +53,7 @@ struct bio_inf {
 		uint8_t format_type[2];
 		unsigned long int _present;
 	}bio_hdr;
+	unsigned int _bdb_type;
 	union {
 		struct autober_blob bdb_nc;
 		struct autober_blob bdb_c;

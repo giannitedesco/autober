@@ -72,6 +72,18 @@ static const struct autober_tag bio_hdr_tags[] = {
 static void *do_free(struct bio_group *bio_group)
 {
 	if ( bio_group ) {
+		if ( bio_group->bio_inf ) {
+			switch(bio_group->bio_inf->_bdb_type) {
+			case BIO_INF_BDB_TYPE_BDB_NC:
+				free(bio_group->bio_inf->bdb.bdb_nc.ptr);
+				break;
+			case BIO_INF_BDB_TYPE_BDB_C:
+				free(bio_group->bio_inf->bdb.bdb_c.ptr);
+				break;
+			default:
+				break;
+			}
+		}
 		free(bio_group->bio_inf);
 		free(bio_group);
 	}
@@ -99,25 +111,41 @@ static int _bio_hdr(struct bio_hdr *bio_hdr,
 
 		switch(tag.ber_tag) {
 		case TAG_BIO_HDR_VERS:
+			if ( !autober_u16(&bio_hdr->vers, &tag, ptr) )
+				return 0;
 			break;
 		case TAG_BIO_HDR_TYPE:
+			if ( !autober_octet(bio_hdr->type, &tag, ptr) )
+				return 0;
 			bio_hdr->_present |= BIO_HDR_TYPE;
 			break;
 		case TAG_BIO_HDR_SUBTYPE:
+			if ( !autober_u8(&bio_hdr->subtype, &tag, ptr) )
+				return 0;
 			bio_hdr->_present |= BIO_HDR_SUBTYPE;
 			break;
 		case TAG_BIO_HDR_DATE:
+			if ( !autober_octet(bio_hdr->date, &tag, ptr) )
+				return 0;
 			bio_hdr->_present |= BIO_HDR_DATE;
 			break;
 		case TAG_BIO_HDR_VALIDITY:
+			if ( !autober_octet(bio_hdr->validity, &tag, ptr) )
+				return 0;
 			bio_hdr->_present |= BIO_HDR_VALIDITY;
 			break;
 		case TAG_BIO_HDR_CREATOR_PID:
+			if ( !autober_octet(bio_hdr->creator_pid, &tag, ptr) )
+				return 0;
 			bio_hdr->_present |= BIO_HDR_CREATOR_PID;
 			break;
 		case TAG_BIO_HDR_FORMAT_OWNER:
+			if ( !autober_octet(bio_hdr->format_owner, &tag, ptr) )
+				return 0;
 			break;
 		case TAG_BIO_HDR_FORMAT_TYPE:
+			if ( !autober_octet(bio_hdr->format_type, &tag, ptr) )
+				return 0;
 			break;
 		default:
 			fprintf(stderr, "Unexpected tag\n");
@@ -157,8 +185,16 @@ static int _bio_inf(struct bio_inf *bio_inf,
 			_bio_hdr(&bio_inf->bio_hdr, ptr, tag.ber_len);
 			break;
 		case TAG_BIO_INF_BDB_NC:
+			if ( !autober_blob(&bio_inf->bdb.bdb_nc,
+						&tag, ptr) )
+				return 0;
+			bio_inf->_bdb_type = BIO_INF_BDB_TYPE_BDB_NC;
 			break;
 		case TAG_BIO_INF_BDB_C:
+			if ( !autober_blob(&bio_inf->bdb.bdb_c,
+						&tag, ptr) )
+				return 0;
+			bio_inf->_bdb_type = BIO_INF_BDB_TYPE_BDB_C;
 			break;
 		default:
 			fprintf(stderr, "Unexpected tag\n");
@@ -189,12 +225,16 @@ static int _bio_group(struct bio_group *bio_group,
 
 		switch(tag.ber_tag) {
 		case TAG_BIO_GROUP_NUM_INSTANCES:
+			if ( !autober_u8(&bio_group->num_instances, &tag, ptr) )
+				return 0;
 			break;
 		case TAG_BIO_GROUP_BIO_INF:
 			bio_group->bio_inf = calloc(cons[1].count,
 						sizeof(*bio_group->bio_inf));
 			if ( NULL == bio_group->bio_inf )
 				return 0;
+
+			bio_group->_bio_inf_count = cons[1].count;
 
 			if ( !_bio_inf(bio_group->bio_inf + cons[1].len,
 					ptr, tag.ber_len) )

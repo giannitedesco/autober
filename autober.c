@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 #include <gber.h>
 #include <autober.h>
 
@@ -28,7 +29,7 @@ static const struct autober_tag *do_find_tag(const struct autober_tag *tags,
 	return NULL;
 }
 
-const struct autober_tag *find_tag(const struct autober_tag *tags,
+const struct autober_tag *autober_find_tag(const struct autober_tag *tags,
 					unsigned int n, gber_tag_t id)
 {
 	return do_find_tag(tags, n, id);
@@ -74,6 +75,9 @@ int autober_constraints(const struct autober_tag *tags,
 					atag->ab_label);
 				return 0;
 			}
+			/* FIXME: check length constraints,
+			 * they vary by type...
+			 */
 			cons[idx].count++;
 			cons[idx].len = tag.ber_len;
 			printf("field[%u] fixed: %s: len = %u\n",
@@ -93,3 +97,52 @@ int autober_constraints(const struct autober_tag *tags,
 
 	return 1;
 }
+
+int autober_u8(uint8_t *out, struct gber_tag *tag, const uint8_t *ptr)
+{
+	assert(tag->ber_len == 1);
+	*out = *ptr;
+	return 1;
+}
+
+int autober_u16(uint16_t *out, struct gber_tag *tag, const uint8_t *ptr)
+{
+	assert(tag->ber_len == 2);
+	*out = (ptr[0] << 8) | ptr[1];
+	return 1;
+}
+
+int autober_u32(uint32_t *out, struct gber_tag *tag, const uint8_t *ptr)
+{
+	assert(tag->ber_len == 4);
+	*out = (ptr[0] << 24) | (ptr[1] << 16) | (ptr[2] << 8) | ptr[3];
+	return 1;
+}
+
+int autober_u64(uint64_t *out, struct gber_tag *tag, const uint8_t *ptr)
+{
+	assert(tag->ber_len == 8);
+	*out =  ((uint64_t)ptr[0] << 56ULL) | ((uint64_t)ptr[1] << 48ULL) |
+		((uint64_t)ptr[2] << 40ULL) | ((uint64_t)ptr[3] << 32ULL) |
+		((uint64_t)ptr[4] << 24ULL) | ((uint64_t)ptr[5] << 16ULL) |
+		((uint64_t)ptr[6] << 8ULL)  | (uint64_t)ptr[7];
+	return 1;
+}
+
+int autober_octet(uint8_t *out, struct gber_tag *tag, const uint8_t *ptr)
+{
+	memcpy(out, ptr, tag->ber_len);
+	return 1;
+}
+
+int autober_blob(struct autober_blob *out, struct gber_tag *tag,
+			const uint8_t *ptr)
+{
+	out->ptr = malloc(tag->ber_len);
+	if ( NULL == out->ptr )
+		return 0;
+	out->len = tag->ber_len;
+	memcpy(out->ptr, ptr, tag->ber_len);
+	return 1;
+}
+
