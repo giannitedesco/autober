@@ -21,10 +21,7 @@ class lexer:
 			self.__append(tok)
 
 	def __qsplit(self, str):
-		"Tokenize a line of netscreen config."
-
-		# Standard whitespace split allowing for quote marks but no
-		# escape chars from within quotemarks
+		# This is a bit fucked
 		inq = False
 		for sub in str.split("'"):
 			y = self.__top()

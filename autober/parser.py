@@ -5,6 +5,8 @@ class Root:
 		self.children.append(child)
 	def __iter__(self):
 		return self.children.__iter__()
+	def __len__(self):
+		return len(self.children)
 	def pretty_print(self, root = None, depth = 0):
 		if not root:
 			root = self
@@ -181,6 +183,7 @@ class parser:
 		self.__stack = [Root()]
 		self.__parse()
 		r = self.__stack.pop()
+		assert(len(r) == 1)
 		self.__parse_tree = r
 	
 	def parse_tree(self):
