@@ -9,3 +9,4 @@ if __name__ == '__main__':
 		parser = autober.parser(lex)
 		p = parser.parse_tree()
 		p.pretty_print()
+		s = autober.semantics(p)
