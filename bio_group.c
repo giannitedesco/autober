@@ -118,6 +118,7 @@ static int _bio_hdr(struct bio_hdr *bio_hdr,
 			if ( !autober_octet(bio_hdr->type, &tag, ptr) )
 				return 0;
 			bio_hdr->_present |= BIO_HDR_TYPE;
+			bio_hdr->_type_len = tag.ber_len;
 			break;
 		case TAG_BIO_HDR_SUBTYPE:
 			if ( !autober_u8(&bio_hdr->subtype, &tag, ptr) )
