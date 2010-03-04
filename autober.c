@@ -67,8 +67,8 @@ int autober_constraints(const struct autober_tag *tags,
 				return 0;
 			}
 			cons[idx].count++;
-			printf("field[%u] template: %s: count = %u\n",
-				idx, atag->ab_label, cons[idx].count);
+			//printf("field[%u] template: %s: count = %u\n",
+			//	idx, atag->ab_label, cons[idx].count);
 		}else{
 			if ( cons[idx].count ) {
 				fprintf(stderr, "%s multiply defined\n",
@@ -80,8 +80,8 @@ int autober_constraints(const struct autober_tag *tags,
 			 */
 			cons[idx].count++;
 			cons[idx].len = tag.ber_len;
-			printf("field[%u] fixed: %s: len = %u\n",
-				idx, atag->ab_label, cons[idx].len);
+			//printf("field[%u] fixed: %s: len = %u\n",
+			//	idx, atag->ab_label, cons[idx].len);
 		}
 
 		ptr += tag.ber_len;

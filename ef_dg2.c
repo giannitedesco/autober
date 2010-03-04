@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <assert.h>
+#include <ctype.h>
 #include <gber.h>
 #include <autober.h>
 #include "bio_group.h"
@@ -38,7 +39,7 @@ static int mapfile(int fd, const uint8_t **begin, size_t *sz)
 	return 1;
 }
 
-void hex_dump(const uint8_t *tmp, size_t len, size_t llen)
+static void hex_dump(const uint8_t *tmp, size_t len, size_t llen)
 {
 	size_t i, j;
 	size_t line;
@@ -80,16 +81,38 @@ static void print_bio_group(struct bio_group *bg)
 	printf("bio_group.num_instances = %u\n", bg->num_instances);
 	for(i = 0; i < bg->num_instances; i++) {
 		struct bio_inf *bi;
+		struct bio_hdr *bh;
 
 		bi = bg->bio_inf + i;
-		printf("bio_inf[i].hdr.vers = 0x%.4x\n",
-			bi->bio_hdr.vers);
-		printf("bio_inf[i].hdr.format_owner = 0x%.4x\n",
-			(bi->bio_hdr.format_owner[0] << 8) |
-			bi->bio_hdr.format_owner[1]);
-		printf("bio_inf[i].hdr.format_type = 0x%.4x\n",
-			(bi->bio_hdr.format_type[0] << 8) |
-			bi->bio_hdr.format_type[1]);
+		bh = &bi->bio_hdr;
+		printf("bio_inf[%u].hdr.vers = 0x%.4x\n", i, bh->vers);
+		if ( bh->_present & BIO_HDR_TYPE )
+			printf("bio_inf[%u].hdr_type = {%.2x, %.2x, %.2x}\n", i,
+				bh->type[0],
+				bh->type[1],
+				bh->type[2]);
+		if ( bh->_present & BIO_HDR_SUBTYPE )
+			printf("bio_inf[%u].hdr.subtype = 0x%.4x\n", i,
+				bh->vers);
+		if ( bh->_present & BIO_HDR_DATE)
+			printf("bio_inf[%u].hdr_date = "
+				"%.2x%.2x-%.2x-%.2x %.2x:%2x:%.2x\n", i,
+				bh->date[0],
+				bh->date[1],
+				bh->date[2],
+				bh->date[3],
+				bh->date[4],
+				bh->date[5],
+				bh->date[6]);
+		printf("bio_inf[%u].hdr.format_owner = 0x%.4x\n", i,
+			(bh->format_owner[0] << 8) |
+			bh->format_owner[1]);
+		printf("bio_inf[%u].hdr.format_type = 0x%.4x\n", i,
+			(bh->format_type[0] << 8) |
+			bh->format_type[1]);
+		printf("bio_inf[%u].hdr.bdb = %sCONSTRUCTED\n", i, 
+			(bi->_bdb_type == BIO_INF_BDB_TYPE_BDB_NC) ?
+				"NON-" : "");
 		hex_dump(bi->bdb.bdb_nc.ptr, bi->bdb.bdb_nc.len, 16);
 	}
 }
