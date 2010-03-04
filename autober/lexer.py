@@ -66,9 +66,9 @@ class LexString(LexToken):
 	def __init__(self, str):
 		self.__string = filter(lambda x:x != '\n', str)
 	def __str__(self):
-		return "'%s'"%self.__string
-	def __repr__(self):
 		return "%s"%self.__string
+	def __repr__(self):
+		return "'%s'"%self.__string.replace("'", "\\'")
 
 class LexOpenBrace(LexToken):
 	def __str__(self):

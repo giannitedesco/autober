@@ -1,12 +1,16 @@
 #!/usr/bin/python
 
 import autober
-import sys
+from sys import stdout,argv
 
 if __name__ == '__main__':
-	for x in sys.argv[1:]:
+	for x in argv[1:]:
 		lex = autober.lexer(open(x))
 		parser = autober.parser(lex)
 		p = parser.parse_tree()
-		p.pretty_print()
-		s = autober.semantics(p)
+		ast = autober.semantics(p)
+
+		codec = autober.codec.c(ast)
+		#f = open("autober.h", 'w')
+		f = stdout
+		codec.write_header(f)

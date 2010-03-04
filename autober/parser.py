@@ -10,6 +10,8 @@ class Root:
 		self.children.append(child)
 	def __iter__(self):
 		return self.children.__iter__()
+	def __getitem__(self, idx):
+		return self.children[idx]
 	def __len__(self):
 		return len(self.children)
 	def pretty_print(self, root = None, depth = 0):
@@ -29,16 +31,16 @@ class Template(Root):
 			self.sequence = False
 		else:
 			if subscript.get_subscript() == None:
-				self.subscript = True
+				self.sequence = True
 			else:
-				raise "Template arrays not supported"
+				raise Exception("Template arrays not supported")
 		Root.__init__(self)
 	def __str__(self):
 		return "T(%s)"%self.label
 	def __repr__(self):
-		return "Template(0x%x, '%s', '%s')"%(self.tag,
+		return "Template(0x%x, '%s', %s)"%(self.tag,
 							self.name,
-							self.label)
+					self.label.replace('\'', '\\\''))
 
 class Union(Root):
 	def __init__(self, name, label):

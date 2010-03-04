@@ -4,7 +4,7 @@ class semantics:
 	def __tmplsym_map(self):
 		ret = {}
 		for x in self.nodes:
-			if x.__class__ == Fixed:
+			if x.__class__ != Template:
 				continue
 			if ret.has_key(x.name):
 				raise Exception("Template name '%s' "
@@ -20,8 +20,7 @@ class semantics:
 
 	def __flatten(self, root):
 		list = []
-		for x in root:
-			self.__do_flatten(list, x)
+		self.__do_flatten(list, root)
 		return list
 
 	def __check_unions(self):
