@@ -70,6 +70,22 @@ def pointer_to(d, name):
 	return ScalarDefinition(d.type, name, True)
 
 class c_codec:
+	def __define_tag(self, tname, name, tag):
+		if tname == '':
+			prefix = ''
+		else:
+			prefix = '_' + tname.upper()
+		self.__macro_tags.append(("TAG%s_%s"%(prefix, name.upper()),
+					"0x%x"%tag))
+
+	def __define_opt(self, tname, name, val):
+		mac = "%s_%s"%(tname.upper(), name.upper())
+		self.__macro_optionals.append((mac, "(1<<%uU)"%val))
+
+	def __define_choice(self, tname, name, val):
+		mac = "%s_TYPE_%s"%(tname.upper(), name.upper())
+		self.__macro_choices.append((mac, val))
+
 	def __do_structs(self, node, name = '', union = False):
 		if union:
 			struct = UnionDefinition(node, name)
@@ -77,23 +93,41 @@ class c_codec:
 			struct = StructDefinition(node, name)
 		for x in node:
 			if x.__class__ == Template:
+				self.__define_tag(node.name, x.name, x.tag)
 				if x.sequence:
 					ret = self.__do_structs(x)
 					struct.add(pointer_to(ret, x.name))
+					struct.add(ScalarDefinition(
+						"unsigned int",
+						"_%s_count"%x.name, False))
 					self.structs.append(ret)
 				else:
 					ret = self.__do_structs(x, x.name)
 					struct.add(ret)
 			elif x.__class__ == Union:
 				ret = self.__do_structs(x, x.name, True)
+				struct.add(ScalarDefinition("unsigned int",
+						"_%s_type"%x.name, False))
 				struct.add(ret)
 				continue
 			else:
+				if union:
+					self.__define_choice(node.name, x.name,
+								x.optindex)
+					print "%s %s %u"%(node.name, x.name,
+							x.optindex)
+				elif x.optional:
+					self.__define_opt(node.name, x.name,
+								x.optindex)
+					print "%s %s %u"%(node.name, x.name,
+							x.optindex)
+				self.__define_tag(node.name, x.name, x.tag)
 				struct.add(scalar(x))
 		return struct
 
 	def __build_structs(self, node):
 		self.structs = []
+		self.__define_tag('', node.name, node.tag)
 		self.structs.append(self.__do_structs(node))
 
 	def __init__(self, ast):
@@ -104,19 +138,38 @@ class c_codec:
 
 		self.root = self.parse[0]
 		self.modname = self.root.name.lower()
+		self.__macro_tags = []
+		self.__macro_choices = []
+		self.__macro_optionals = []
 		self.__build_structs(self.root)
 
 	def __write_struct(self, s, f):
 		s.write(f)
 
+	def __write_macros(self, f):
+		for macro in self.__macro_tags:
+			f.write("#define %s\t\t%s\n"%macro)
+		f.write("\n")
+		for macro in self.__macro_optionals:
+			f.write("#define %s\t\t%s\n"%macro)
+		f.write("\n")
+		for macro in self.__macro_choices:
+			f.write("#define %s\t\t%s\n"%macro)
+
 	def write_header(self, f):
 		f.write("#ifndef _%s_H\n"%self.modname.upper())
 		f.write("#define _%s_H\n"%self.modname.upper())
-
 		f.write("\n")
+
+		self.__write_macros(f)
+		f.write("\n")
+
 		for s in self.structs:
 			self.__write_struct(s, f)
+			f.write("\n")
 		f.write("\n")
+
+		# TODO: write function prototypes
 
 		f.write("#endif /* _%s_H */\n"%self.modname.upper())
 		return

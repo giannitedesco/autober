@@ -8,17 +8,11 @@
 #define _BIO_GROUP_H
 
 #define TAG_BIO_GROUP				0x7f61
-
 #define TAG_BIO_GROUP_NUM_INSTANCES		0x02
 #define TAG_BIO_GROUP_BIO_INF			0x7f60
-
 #define TAG_BIO_INF_BIO_HDR			0xa1
 #define TAG_BIO_INF_BDB_NC			0x5f2e
 #define TAG_BIO_INF_BDB_C			0x7f2e
-
-#define BIO_INF_BDB_TYPE_BDB_NC			0
-#define BIO_INF_BDB_TYPE_BDB_C			1
-
 #define TAG_BIO_HDR_VERS			0x80
 #define TAG_BIO_HDR_TYPE			0x81
 #define TAG_BIO_HDR_SUBTYPE			0x82
@@ -33,6 +27,9 @@
 #define BIO_HDR_DATE				(1<<2)
 #define BIO_HDR_VALIDITY			(1<<3)
 #define BIO_HDR_CREATOR_PID			(1<<4)
+
+#define BIO_INF_BDB_TYPE_BDB_NC			0
+#define BIO_INF_BDB_TYPE_BDB_C			1
 
 struct bio_group {
 	uint8_t num_instances;

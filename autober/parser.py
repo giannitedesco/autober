@@ -27,6 +27,7 @@ class Template(Root):
 		self.tag = tag
 		self.name = name
 		self.label = label
+		self.optindex = 0
 		if subscript == None:
 			self.sequence = False
 		else:
@@ -46,6 +47,7 @@ class Union(Root):
 	def __init__(self, name, label):
 		self.name = name
 		self.label = label
+		self.optindex = 0
 		Root.__init__(self)
 	def __str__(self):
 		return "U(%s)"%self.label
@@ -53,10 +55,11 @@ class Union(Root):
 		return "Union('%s', '%s')"%(self.name, self.label)
 
 class Fixed:
-	def __init__(self, tag, type, subscript, name):
+	def __init__(self, tag, type, subscript, name, optional = False):
 		self.tag = tag
 		self.type = type
 		self.name = name
+		self.optional = optional
 		if subscript:
 			ss = subscript.get_subscript()
 			if ss.__class__ == LexInteger:
@@ -209,9 +212,13 @@ class parser:
 		if tok.__class__ != LexSemiColon:
 			raise Exception("Parse Error: %s")
 		fixd = Fixed(self.__tagno, self.__type,
-				self.__subscript, self.__name)
+				self.__subscript, self.__name,
+				self.__optional)
 		x = self.__stack.pop()
 		fixd.parent = x
+		if self.__optional or x.__class__ == Union:
+			fixd.optindex = x.optindex
+			x.optindex += 1
 		x.add(fixd)
 		self.__stack.append(x)
 		self.__state = self.STATE_TAG
