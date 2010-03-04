@@ -15,7 +15,6 @@ struct autober_blob {
 #define AUTOBER_TYPE_BLOB	0
 #define AUTOBER_TYPE_OCTET	1
 #define AUTOBER_TYPE_INT	2 /* min = octets */
-#define AUTOBER_TYPE_BCD	3 /* min elements of max binary digits */
 typedef unsigned int autober_type_t;
 
 #define AUTOBER_TEMPLATE	(1<<0)
