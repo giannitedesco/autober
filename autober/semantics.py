@@ -44,37 +44,16 @@ class semantics:
 						"with parent: %s"%(u.name,
 								us & ps))
 
-	def __tag_sequences(self):
-		for t in self.nodes:
-			if t.__class__ != Template:
-				continue
-			if len(t.name) < 2 or t.name[-2:] != '[]':
-				continue
-			t.sequence = True
-			t.name = t.name[:-2]
-
-	def __tag_fixed(self):
-		for f in self.nodes:
-			if f.__class__ != Fixed:
-				continue
-			print "%s -> %s"%(f.type, f.name)
-
 	def __init__(self, root):
 		self.parse_tree = root
 		self.nodes = self.__flatten(root)
 
-		# 1. Type tagging of templates (sequences or not)
-		self.__tag_sequences()
-
 		# 2. Check template names not multiply defined
 		self.templates = self.__tmplsym_map()
 
-		# 3. Check union tags don't conflict with parent template
+		# 2. Check union tags don't conflict with parent template
 		self.unions = self.__check_unions()
 
-		# 4. Type/len-constraint tagging of fixed fields
-		self.__tag_fixed()
-
-		# 5. Check variable names valid C tokens
+		# 3. Check variable names valid C tokens
 
 		return

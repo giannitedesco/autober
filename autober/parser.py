@@ -1,3 +1,7 @@
+from lexer import LexToken, LexInteger, LexIntRange, LexKeyword
+from lexer import LexIdentifier, LexSubscript, LexString 
+from lexer import LexOpenBrace, LexCloseBrace, LexSemiColon
+
 class Root:
 	def __init__(self):
 		self.children = []
@@ -17,11 +21,17 @@ class Root:
 
 
 class Template(Root):
-	def __init__(self, tag, name, label):
+	def __init__(self, tag, name, subscript, label):
 		self.tag = tag
 		self.name = name
 		self.label = label
-		self.sequence = None
+		if subscript == None:
+			self.sequence = False
+		else:
+			if subscript.get_subscript() == None:
+				self.subscript = True
+			else:
+				raise "Template arrays not supported"
 		Root.__init__(self)
 	def __str__(self):
 		return "T(%s)"%self.label
@@ -41,10 +51,21 @@ class Union(Root):
 		return "Union('%s', '%s')"%(self.name, self.label)
 
 class Fixed:
-	def __init__(self, tag, type, name):
+	def __init__(self, tag, type, subscript, name):
 		self.tag = tag
 		self.type = type
 		self.name = name
+		if subscript:
+			ss = subscript.get_subscript()
+			if ss.__class__ == LexInteger:
+				min = max = int(ss)
+			elif ss.__class__ == LexIntRange:
+				(min, max) = ss 
+			else:
+				raise Exception("WTF %s"%ss)
+			self.constraint = (min, max)
+		else:
+			self.constraint = None
 	def __iter__(self):
 		return [].__iter__()
 	def __str__(self):
@@ -57,12 +78,14 @@ class parser:
 	STATE_TAG	= 0 # initial state
 	STATE_FLAGS	= 1 # template/fixed flags
 	STATE_T_NAME	= 2 # template name
-	STATE_T_LABEL	= 3 # template label
-	STATE_F_TYPE	= 4 # fixed type
-	STATE_F_NAME	= 5 # fixed name
-	STATE_PUSH	= 6 # recurse
-	STATE_POP	= 7 # recurse
-	STATE_ADD	= 8 # add fixed item
+	STATE_T_SUB	= 3 # template name
+	STATE_T_LABEL	= 4 # template label
+	STATE_F_TYPE	= 5 # fixed type
+	STATE_F_SUB	= 6
+	STATE_F_NAME	= 7 # fixed name
+	STATE_PUSH	= 8 # recurse
+	STATE_POP	= 9 # recurse
+	STATE_ADD	= 10 # add fixed item
 
 	def __template(self):
 		if self.__noconstruct:
@@ -77,7 +100,7 @@ class parser:
 		return bool(id & 0x20)
 
 	def __tag(self, tok):
-		if tok == '}':
+		if tok.__class__ == LexCloseBrace:
 			self.__state = self.STATE_POP
 			return False
 
@@ -89,23 +112,29 @@ class parser:
 		self.__name = ''
 		self.__label = None
 		self.__type = None
+		self.__subscript = None
 
-		if tok == 'union':
-			self.__union = True
-			self.__state = self.STATE_T_NAME
-		else:
-			self.__tagno = int(tok, 0)
+		if tok.__class__ == LexInteger:
+			self.__tagno = int(tok)
 			assert(self.__tagno < 0x10000)
 			self.__state = self.STATE_FLAGS
-		return True
+			return True
+		elif tok.__class__ == LexKeyword:
+			if int(tok) == tok.UNION:
+				self.__union = True
+				self.__state = self.STATE_T_NAME
+				return True
+		raise Exception("Parse error")
 
 	def __flags(self, tok):
-		if tok == "OPTIONAL":
-			self.__optional = True
-			return True
-		if tok == "NOCONSTRUCT":
-			self.__noconstruct = True
-			return True
+		if tok.__class__ == LexKeyword:
+			if int(tok) == tok.OPTIONAL:
+				self.__optional = True
+				return True
+			if int(tok) == tok.NOCONSTRUCT:
+				self.__noconstruct = True
+				return True
+			raise Exception("Parse error")
 		if self.__template():
 			self.__state = self.STATE_T_NAME
 		else:
@@ -113,33 +142,52 @@ class parser:
 		return False
 
 	def __t_name(self, tok):
-		self.__name = tok
+		self.__name = str(tok)
+		self.__state = self.STATE_T_SUB
+		return True
+
+	def __t_sub(self, tok):
+		if tok.__class__ != LexSubscript:
+			self.__state = self.STATE_T_LABEL
+			return False
+		self.__subscript = tok
 		self.__state = self.STATE_T_LABEL
 		return True
 
 	def __t_label(self, tok):
-		self.__label = tok
+		self.__label = str(tok)
 		self.__state = self.STATE_PUSH
 		return True
 
 	def __f_type(self, tok):
 		self.__type = tok
+		self.__state = self.STATE_F_SUB
+		return True
+
+	def __f_sub(self, tok):
+		if tok.__class__ != LexSubscript:
+			self.__state = self.STATE_F_NAME
+			return False
+		self.__subscript = tok
 		self.__state = self.STATE_F_NAME
 		return True
 
 	def __f_name(self, tok):
-		self.__name = tok
+		self.__name = str(tok)
 		self.__state = self.STATE_ADD
 		return True
 
 	def __f_push(self, tok):
-		assert(tok == '{')
 		assert(self.__template())
+
+		if tok.__class__ != LexOpenBrace:
+			raise Exception("Parse Error:")
 
 		if self.__union:
 			tmpl = Union(self.__name, self.__label)
 		else:
-			tmpl = Template(self.__tagno, self.__name, self.__label)
+			tmpl = Template(self.__tagno, self.__name,
+					self.__subscript, self.__label)
 		x = self.__stack.pop()
 		tmpl.parent = x
 		x.add(tmpl)
@@ -149,14 +197,17 @@ class parser:
 		return True
 	
 	def __f_pop(self, tok):
-		assert(tok == '}')
+		if tok.__class__ != LexCloseBrace:
+			raise Exception("Parse Error")
 		self.__state = self.STATE_TAG
 		self.__stack.pop()
 		return True
 	
 	def __f_add(self, tok):
-		assert(tok == ';')
-		fixd = Fixed(self.__tagno, self.__type, self.__name)
+		if tok.__class__ != LexSemiColon:
+			raise Exception("Parse Error: %s")
+		fixd = Fixed(self.__tagno, self.__type,
+				self.__subscript, self.__name)
 		x = self.__stack.pop()
 		fixd.parent = x
 		x.add(fixd)
@@ -169,8 +220,10 @@ class parser:
 			self.STATE_TAG: self.__tag,
 			self.STATE_FLAGS: self.__flags,
 			self.STATE_T_NAME: self.__t_name,
+			self.STATE_T_SUB: self.__t_sub,
 			self.STATE_T_LABEL: self.__t_label,
 			self.STATE_F_TYPE: self.__f_type,
+			self.STATE_F_SUB: self.__f_sub,
 			self.STATE_F_NAME: self.__f_name,
 			self.STATE_PUSH: self.__f_push,
 			self.STATE_POP: self.__f_pop,
