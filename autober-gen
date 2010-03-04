@@ -11,6 +11,6 @@ if __name__ == '__main__':
 		ast = autober.semantics(p)
 
 		codec = autober.codec.c(ast)
-		#f = open("autober.h", 'w')
-		f = stdout
+		f = open("autober.h", 'w')
+		#f = stdout
 		codec.write_header(f)
