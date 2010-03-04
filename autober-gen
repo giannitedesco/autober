@@ -11,6 +11,12 @@ if __name__ == '__main__':
 		ast = autober.semantics(p)
 
 		codec = autober.codec.c(ast)
-		f = open("autober.h", 'w')
-		#f = stdout
-		codec.write_header(f)
+		h_file = "auto_" + codec.modname + ".h"
+		c_file = "auto_" + codec.modname + ".c"
+		h = open(h_file, 'w')
+		#h = stdout
+		codec.write_header(h)
+		c = open(c_file, 'w')
+		#c = stdout
+		codec.include(h_file)
+		codec.write_code(c)

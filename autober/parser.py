@@ -6,6 +6,7 @@ class Root:
 	def __init__(self):
 		self.children = []
 		self.parent = None
+		self.name = ''
 	def add(self, child):
 		self.children.append(child)
 	def __iter__(self):
@@ -24,6 +25,7 @@ class Root:
 
 class Template(Root):
 	def __init__(self, tag, name, subscript, label):
+		Root.__init__(self)
 		self.tag = tag
 		self.name = name
 		self.label = label
@@ -35,7 +37,6 @@ class Template(Root):
 				self.sequence = True
 			else:
 				raise Exception("Template arrays not supported")
-		Root.__init__(self)
 	def __str__(self):
 		return "T(%s)"%self.label
 	def __repr__(self):
@@ -45,10 +46,10 @@ class Template(Root):
 
 class Union(Root):
 	def __init__(self, name, label):
+		Root.__init__(self)
 		self.name = name
 		self.label = label
 		self.optindex = 0
-		Root.__init__(self)
 	def __str__(self):
 		return "U(%s)"%self.label
 	def __repr__(self):

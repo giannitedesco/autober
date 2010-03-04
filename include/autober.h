@@ -21,7 +21,7 @@ typedef unsigned int autober_type_t;
 #define AUTOBER_UNION		(1<<1) /* only valid for templates */
 #define AUTOBER_SEQUENCE	(1<<2) /* only valid for templates */
 #define AUTOBER_OPTIONAL	(1<<3)
-#define AUTOBER_CHECK_SIZE	(1<<4) /* semantics type specific */
+#define AUTOBER_CHECK_SIZE	(1<<4) /* in bytes */
 struct autober_tag {
 	gber_tag_t	ab_tag;
 	unsigned int	ab_flags;

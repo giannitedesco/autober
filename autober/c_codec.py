@@ -1,13 +1,20 @@
-from parser import Template, Union, Fixed
+from parser import Template, Union, Fixed, Root
 
-class VarDefinition:
+def tag_macro(tname, name):
+	if tname == '':
+		prefix = ''
+	else:
+		prefix = '_' + tname.upper()
+	return "TAG%s_%s"%(prefix, name.upper())
+
+class VarDeclaration:
 	def __getitem__(self):
 		raise IndexError
 	def __iter__(self):
 		return [].__iter__()
 		
 
-class CompoundDefinition(VarDefinition):
+class CompoundDeclaration(VarDeclaration):
 	def __init__(self, tag, template, name = ''):
 		self.name = name
 		self.type = tag + " " + template.name
@@ -28,14 +35,14 @@ class CompoundDefinition(VarDefinition):
 		f.write(tabs + "}%s;\n"%self.name)
 		pass
 
-class StructDefinition(CompoundDefinition):
+class StructDeclaration(CompoundDeclaration):
 	def __init__(self, template, name = ''):
-		CompoundDefinition.__init__(self, "struct", template, name)
-class UnionDefinition(CompoundDefinition):
+		CompoundDeclaration.__init__(self, "struct", template, name)
+class UnionDeclaration(CompoundDeclaration):
 	def __init__(self, template, name = ''):
-		CompoundDefinition.__init__(self, "union", template, name)
+		CompoundDeclaration.__init__(self, "union", template, name)
 
-class ScalarDefinition(VarDefinition):
+class ScalarDeclaration(VarDeclaration):
 	def __init__(self, type, name, ptr, arraysz = None):
 		if type == "octet":
 			self.type = 'uint8_t'
@@ -64,19 +71,91 @@ def scalar(fixed):
 		arraysz = fixed.constraint[1]
 	else:
 		arraysz = None
-	return ScalarDefinition(fixed.type.name, fixed.name, False, arraysz)
+	return ScalarDeclaration(fixed.type.name, fixed.name, False, arraysz)
 
 def pointer_to(d, name):
-	return ScalarDefinition(d.type, name, True)
+	return ScalarDeclaration(d.type, name, True)
+
+class TagDefinition:
+	__typemap = {"blob": "AUTOBER_TYPE_BLOB",
+			"octet": "AUTOBER_TYPE_OCTET",
+			"uint8_t": "AUTOBER_TYPE_INT",
+			"uint16_t": "AUTOBER_TYPE_INT",
+			"uint32_t": "AUTOBER_TYPE_INT",
+			"uint64_t": "AUTOBER_TYPE_INT",
+		}
+	__multiplier = {"blob": 0,
+			"octet": 1,
+			"uint8_t": 1,
+			"uint16_t": 2,
+			"uint32_t": 4,
+			"uint64_t": 8}
+
+	def __check_size(self, tag):
+		mult = self.__multiplier[str(tag.type)]
+		if 0 == mult:
+			return
+
+		if tag.constraint == None:
+			con = (1,1)
+		else:
+			con = tag.constraint
+
+		self.constraint = tuple(map(lambda x:x * mult, con))
+		self.check_size = True
+
+	def __init__(self, tag, union = False):
+		self.tag = tag.tag
+		self.tag_macro = tag_macro(tag.parent.name, tag.name)
+		self.union = union
+		self.check_size = False
+		self.sequence = False
+		if tag.__class__ == Template:
+			self.template = True
+			self.optional = False
+			if tag.sequence:
+				self.sequence = True
+			self.label = tag.label
+			self.type = None
+		elif tag.__class__ == Fixed:
+			self.template = False
+			self.optional = tag.optional
+			self.label = tag.name
+			self.type = self.__typemap[str(tag.type)]
+			self.__check_size(tag)
+		else:
+			raise Exception("Unnion not permitted in tag block")
+	def __int__(self):
+		return self.tag
+	def __cmp__(a, b):
+		return int(a) - int(b)
+	def flags(self):
+		list = []
+		if self.template:
+			list.append("AUTOBER_TEMPLATE")
+		if self.union:
+			list.append("AUTOBER_UNION")
+		if self.sequence:
+			list.append("AUTOBER_SEQUENCE")
+		if self.optional:
+			list.append("AUTOBER_OPTIONAL")
+		if self.check_size:
+			list.append("AUTOBER_CHECK_SIZE")
+		return "|".join(list)
+
+	def write(self, f):
+		f.write("\t{.ab_label = \"%s\",\n"%self.label)
+		if self.type != None:
+			f.write("\t\t.ab_type = %s,\n"%self.type)
+		if self.flags() != '':
+			f.write("\t\t.ab_flags = %s,\n"%self.flags())
+		if self.check_size:
+			f.write("\t\t.ab_count = {%u, %u},\n"%self.constraint)
+		f.write("\t\t.ab_tag = %s},\n"%self.tag_macro)
 
 class c_codec:
 	def __define_tag(self, tname, name, tag):
-		if tname == '':
-			prefix = ''
-		else:
-			prefix = '_' + tname.upper()
-		self.__macro_tags.append(("TAG%s_%s"%(prefix, name.upper()),
-					"0x%x"%tag))
+		self.__macro_tags.append((tag_macro(tname, name), "0x%x"%tag))
 
 	def __define_opt(self, tname, name, val):
 		mac = "%s_%s"%(tname.upper(), name.upper())
@@ -88,16 +167,16 @@ class c_codec:
 
 	def __do_structs(self, node, name = '', union = False):
 		if union:
-			struct = UnionDefinition(node, name)
+			struct = UnionDeclaration(node, name)
 		else:
-			struct = StructDefinition(node, name)
+			struct = StructDeclaration(node, name)
 		for x in node:
 			if x.__class__ == Template:
 				self.__define_tag(node.name, x.name, x.tag)
 				if x.sequence:
 					ret = self.__do_structs(x)
 					struct.add(pointer_to(ret, x.name))
-					struct.add(ScalarDefinition(
+					struct.add(ScalarDeclaration(
 						"unsigned int",
 						"_%s_count"%x.name, False))
 					self.structs.append(ret)
@@ -106,7 +185,7 @@ class c_codec:
 					struct.add(ret)
 			elif x.__class__ == Union:
 				ret = self.__do_structs(x, x.name, True)
-				struct.add(ScalarDefinition("unsigned int",
+				struct.add(ScalarDeclaration("unsigned int",
 						"_%s_type"%x.name, False))
 				struct.add(ret)
 				continue
@@ -114,13 +193,9 @@ class c_codec:
 				if union:
 					self.__define_choice(node.name, x.name,
 								x.optindex)
-					print "%s %s %u"%(node.name, x.name,
-							x.optindex)
 				elif x.optional:
 					self.__define_opt(node.name, x.name,
 								x.optindex)
-					print "%s %s %u"%(node.name, x.name,
-							x.optindex)
 				self.__define_tag(node.name, x.name, x.tag)
 				struct.add(scalar(x))
 		return struct
@@ -142,6 +217,8 @@ class c_codec:
 		self.__macro_choices = []
 		self.__macro_optionals = []
 		self.__build_structs(self.root)
+		self.__sysincl = ["stdlib.h", "stdint.h", "stdio.h"]
+		self.__incl = ["gber.h", "autober.h"]
 
 	def __write_struct(self, s, f):
 		s.write(f)
@@ -157,6 +234,7 @@ class c_codec:
 			f.write("#define %s\t\t%s\n"%macro)
 
 	def write_header(self, f):
+		f.write("/* Generated by autober: do not modify */\n")
 		f.write("#ifndef _%s_H\n"%self.modname.upper())
 		f.write("#define _%s_H\n"%self.modname.upper())
 		f.write("\n")
@@ -167,9 +245,47 @@ class c_codec:
 		for s in self.structs:
 			self.__write_struct(s, f)
 			f.write("\n")
-		f.write("\n")
 
 		# TODO: write function prototypes
 
 		f.write("#endif /* _%s_H */\n"%self.modname.upper())
+
+	def include(self, incl, sys = False):
+		list = sys and self.__sysincl or self.__incl
+		list.append(incl)
+
+	def __write_incl(self, f):
+		for inc in self.__sysincl:
+			f.write("#include <%s>\n"%inc)
+		for inc in self.__incl:
+			f.write("#include \"%s\"\n"%inc)
+
+	def __write_tagblock(self, f, t, name):
+		f.write("static const struct autober_tag %s[] = {\n"%name);
+		taglist = filter(lambda x:not x.__class__ == Union, t)
+		ul = filter(lambda x:x.__class__ == Union, t)
+		unionlist = []
+		for u in ul:
+			unionlist.extend(u)
+
+		tags = map(lambda x:TagDefinition(x), taglist)
+		unions = map(lambda x:TagDefinition(x, union = True), unionlist)
+
+		list = tags + unions
+
+		list.sort()
+		for tag in list:
+			tag.write(f)
+		f.write("};\n\n")
+
+	def __write_tagblocks(self, f):
+		self.__write_tagblock(f, self.parse, "root_tags")
+		for t in self.ast.templates.values():
+			self.__write_tagblock(f, t, t.name + "_tags")
 		return
+
+	def write_code(self, f):
+		f.write("/* Generated by autober: do not modify */\n")
+		self.__write_incl(f)
+		f.write("\n")
+		self.__write_tagblocks(f)
