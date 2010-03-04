@@ -1,6 +1,7 @@
 class Root:
 	def __init__(self):
 		self.children = []
+		self.parent = None
 	def add(self, child):
 		self.children.append(child)
 	def __iter__(self):
@@ -12,8 +13,7 @@ class Root:
 			root = self
 		for x in root:
 			print "%s%s"%(''.join("  " for x in range(depth)), x)
-			if x.__class__ != Fixed:
-				self.pretty_print(x, depth + 1)
+			self.pretty_print(x, depth + 1)
 
 
 class Template(Root):
@@ -21,6 +21,7 @@ class Template(Root):
 		self.tag = tag
 		self.name = name
 		self.label = label
+		self.sequence = None
 		Root.__init__(self)
 	def __str__(self):
 		return "T(%s)"%self.label
@@ -44,6 +45,8 @@ class Fixed:
 		self.tag = tag
 		self.type = type
 		self.name = name
+	def __iter__(self):
+		return [].__iter__()
 	def __str__(self):
 		return "F(%s)"%self.name
 	def __repr__(self):
@@ -138,6 +141,7 @@ class parser:
 		else:
 			tmpl = Template(self.__tagno, self.__name, self.__label)
 		x = self.__stack.pop()
+		tmpl.parent = x
 		x.add(tmpl)
 		self.__stack.append(x)
 		self.__stack.append(tmpl)
@@ -154,6 +158,7 @@ class parser:
 		assert(tok == ';')
 		fixd = Fixed(self.__tagno, self.__type, self.__name)
 		x = self.__stack.pop()
+		fixd.parent = x
 		x.add(fixd)
 		self.__stack.append(x)
 		self.__state = self.STATE_TAG
