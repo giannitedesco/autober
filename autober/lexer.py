@@ -25,12 +25,11 @@ class LexIntRange(LexToken):
 			raise IndexError
 
 class LexKeyword(LexToken):
-	NONE		= 0
-	OPTIONAL 	= 1
-	NOCONSTRUCT	= 2
-	UNION		= 3
+	OPTIONAL 	= 0
+	NOCONSTRUCT	= 1
+	UNION		= 2
 	def __getitem__(self, idx):
-		return self.__map.get(idx, self.NONE)
+		return self.__map[idx]
 	def __init__(self, tok):
 		self.__map = {"OPTIONAL": self.OPTIONAL,
 				"NOCONSTRUCT": self.NOCONSTRUCT,
@@ -40,7 +39,35 @@ class LexKeyword(LexToken):
 				self.UNION: "union"}
 		self.keyword = self[tok]
 	def __str__(self):
-		return self.__rmap.get(self.keyword, "NONE")
+		return self.__rmap[self.keyword]
+	def __int__(self):
+		return self.keyword
+
+class LexType(LexToken):
+	OCTET		= 0
+	UINT8		= 1
+	UINT16		= 2
+	UINT32		= 3
+	UINT64		= 4
+	BLOB		= 5
+	def __getitem__(self, idx):
+		return self.__map[idx]
+	def __init__(self, tok):
+		self.__map = {"octet": self.OCTET,
+				"uint8_t": self.UINT8,
+				"uint16_t": self.UINT16,
+				"uint32_t": self.UINT32,
+				"uint64_t": self.UINT64,
+				"blob": self.BLOB}
+		self.__rmap = {self.OCTET: "octet",
+				self.UINT8: "uint8_t",
+				self.UINT16: "uint16_t",
+				self.UINT32: "uint32_t",
+				self.UINT64: "uint64_t",
+				self.BLOB: "blob"}
+		self.type_id = self[tok]
+	def __str__(self):
+		return self.__rmap[self.type_id]
 	def __int__(self):
 		return self.keyword
 
@@ -183,9 +210,14 @@ class lexer:
 	def __tag_one(self, tok):
 		if LexToken in tok.__class__.__bases__:
 			return tok
-		kw = LexKeyword(tok)
-		if kw.keyword != kw.NONE:
-			return kw
+		try:
+			return LexKeyword(tok)
+		except KeyError:
+			pass
+		try:
+			return LexType(tok)
+		except KeyError:
+			pass
 		if tok == '{':
 			return LexOpenBrace()
 		if tok == '}':

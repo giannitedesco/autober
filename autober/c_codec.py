@@ -73,7 +73,7 @@ def scalar(fixed):
 		arraysz = fixed.constraint[1]
 	else:
 		arraysz = None
-	return ScalarDeclaration(fixed.type.name, fixed.name, None, arraysz)
+	return ScalarDeclaration(str(fixed.type), fixed.name, None, arraysz)
 
 def pointer_to(d, name):
 	return ScalarDeclaration(d.type, name, d)

@@ -1,4 +1,4 @@
-from lexer import LexToken, LexInteger, LexIntRange, LexKeyword
+from lexer import LexToken, LexInteger, LexIntRange, LexKeyword, LexType
 from lexer import LexIdentifier, LexSubscript, LexString 
 from lexer import LexOpenBrace, LexCloseBrace, LexSemiColon
 
@@ -122,7 +122,8 @@ class parser:
 
 		if tok.__class__ == LexInteger:
 			self.__tagno = int(tok)
-			assert(self.__tagno < 0x10000)
+			if self.__tagno > 0xffff:
+				raise Exception("Parse error")
 			self.__state = self.STATE_FLAGS
 			return True
 		elif tok.__class__ == LexKeyword:
@@ -148,6 +149,8 @@ class parser:
 		return False
 
 	def __t_name(self, tok):
+		if tok.__class__ != LexIdentifier:
+			raise Exception("Parse error")
 		self.__name = str(tok)
 		self.__state = self.STATE_T_SUB
 		return True
@@ -161,11 +164,15 @@ class parser:
 		return True
 
 	def __t_label(self, tok):
+		if tok.__class__ != LexString:
+			raise Exception("Parse error")
 		self.__label = str(tok)
 		self.__state = self.STATE_PUSH
 		return True
 
 	def __f_type(self, tok):
+		if tok.__class__ != LexType:
+			raise Exception("Parse error")
 		self.__type = tok
 		self.__state = self.STATE_F_SUB
 		return True
@@ -179,12 +186,15 @@ class parser:
 		return True
 
 	def __f_name(self, tok):
+		if tok.__class__ != LexIdentifier:
+			raise Exception("Parse error")
 		self.__name = str(tok)
 		self.__state = self.STATE_ADD
 		return True
 
 	def __f_push(self, tok):
-		assert(self.__template())
+		if not self.__template():
+			raise Exception("Parse Error:")
 
 		if tok.__class__ != LexOpenBrace:
 			raise Exception("Parse Error:")
