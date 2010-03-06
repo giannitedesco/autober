@@ -212,6 +212,7 @@ class c_codec:
 		self.ast = ast
 		self.parse = ast.parse_tree
 
+		self.parse.pretty_print()
 		assert(1 == len(self.parse))
 
 		self.root = self.parse[0]
