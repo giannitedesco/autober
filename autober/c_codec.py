@@ -1,4 +1,4 @@
-from parser import Template, Union, Fixed, Root
+from syntax import *
 
 def tag_macro(tname, name):
 	if tname == '':
@@ -152,7 +152,7 @@ class TagDefinition:
 		if self.flags() != '':
 			f.write("\t\t.ab_flags = %s,\n"%self.flags())
 		if self.check_size:
-			f.write("\t\t.ab_count = {%u, %u},\n"%self.constraint)
+			f.write("\t\t.ab_size = {%u, %u},\n"%self.constraint)
 		f.write("\t\t.ab_tag = %s},\n"%self.tag_macro)
 
 class c_codec:
@@ -209,20 +209,22 @@ class c_codec:
 		self.structs.append(self.root_struct)
 
 	def __init__(self, ast):
+		# setup attributes
 		self.ast = ast
 		self.parse = ast.parse_tree
-
 		self.parse.pretty_print()
 		assert(1 == len(self.parse))
-
 		self.root = self.parse[0]
 		self.modname = self.root.name.lower()
+
+		# setup preprocessor
 		self.__macro_tags = []
 		self.__macro_choices = []
 		self.__macro_optionals = []
-		self.__build_structs(self.root)
 		self.__sysincl = ["stdlib.h", "stdint.h", "stdio.h"]
 		self.__incl = ["gber.h", "autober.h"]
+
+		self.__build_structs(self.root)
 
 	def __write_struct(self, s, f):
 		s.write(f)

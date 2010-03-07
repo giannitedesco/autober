@@ -55,4 +55,6 @@ class semantics:
 
 		# 3. Check variable names valid C tokens
 
+		# 4. check identifiers unique according to their namespace
+
 		return

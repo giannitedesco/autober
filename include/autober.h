@@ -25,7 +25,7 @@ typedef unsigned int autober_type_t;
 struct autober_tag {
 	gber_tag_t	ab_tag;
 	unsigned int	ab_flags;
-	size_t		ab_count[2];
+	size_t		ab_size[2];
 	autober_type_t	ab_type;
 	const char	*ab_label;
 };

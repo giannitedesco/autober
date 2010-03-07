@@ -14,7 +14,7 @@ static const struct autober_tag root_tags[] = {
 static const struct autober_tag bio_group_tags[] = {
 	{.ab_label = "num_instances",
 		.ab_tag = TAG_BIO_GROUP_NUM_INSTANCES,
-		.ab_count = {1,1},
+		.ab_size = {1,1},
 		.ab_type = AUTOBER_TYPE_INT},
 	{.ab_label = "bio_inf",
 		.ab_label = "Biometric 'Information' Template",
@@ -37,35 +37,35 @@ static const struct autober_tag bio_inf_tags[] = {
 static const struct autober_tag bio_hdr_tags[] = {
 	{.ab_label = "vers",
 		.ab_tag = TAG_BIO_HDR_VERS,
-		.ab_count = {2,2},
+		.ab_size = {2,2},
 		.ab_type = AUTOBER_TYPE_INT},
 	{.ab_label = "type",
 		.ab_tag = TAG_BIO_HDR_TYPE,
-		.ab_count = {2,3},
+		.ab_size = {2,3},
 		.ab_type = AUTOBER_TYPE_OCTET|AUTOBER_OPTIONAL},
 	{.ab_label = "subtype",
 		.ab_tag = TAG_BIO_HDR_SUBTYPE,
-		.ab_count = {2,2},
+		.ab_size = {2,2},
 		.ab_type = AUTOBER_TYPE_INT|AUTOBER_OPTIONAL},
 	{.ab_label = "date",
 		.ab_tag = TAG_BIO_HDR_DATE,
-		.ab_count = {7,7},
+		.ab_size = {7,7},
 		.ab_type = AUTOBER_TYPE_OCTET|AUTOBER_OPTIONAL},
 	{.ab_label = "validty",
 		.ab_tag = TAG_BIO_HDR_VALIDITY,
-		.ab_count = {8,8},
+		.ab_size = {8,8},
 		.ab_type = AUTOBER_TYPE_OCTET|AUTOBER_OPTIONAL},
 	{.ab_label = "creator_pid",
 		.ab_tag = TAG_BIO_HDR_CREATOR_PID,
-		.ab_count = {2,2},
+		.ab_size = {2,2},
 		.ab_type = AUTOBER_TYPE_OCTET|AUTOBER_OPTIONAL},
 	{.ab_label = "format_owner",
 		.ab_tag = TAG_BIO_HDR_FORMAT_OWNER,
-		.ab_count = {2,2},
+		.ab_size = {2,2},
 		.ab_type = AUTOBER_TYPE_OCTET},
 	{.ab_label = "format_type",
 		.ab_tag = TAG_BIO_HDR_FORMAT_TYPE,
-		.ab_count = {2,2},
+		.ab_size = {2,2},
 		.ab_type = AUTOBER_TYPE_OCTET},
 };
 
@@ -219,6 +219,11 @@ static int _bio_group(struct bio_group *bio_group,
 		return 0;
 	}
 
+	bio_group->bio_inf = calloc(cons[1].count,
+				sizeof(*bio_group->bio_inf));
+	if ( NULL == bio_group->bio_inf )
+		return 0;
+
 	for(end = ptr + len; ptr < end; ptr += tag.ber_len) {
 		ptr = ber_decode_tag(&tag, ptr, end - ptr);
 		if ( NULL == ptr )
@@ -230,17 +235,11 @@ static int _bio_group(struct bio_group *bio_group,
 				return 0;
 			break;
 		case TAG_BIO_GROUP_BIO_INF:
-			bio_group->bio_inf = calloc(cons[1].count,
-						sizeof(*bio_group->bio_inf));
-			if ( NULL == bio_group->bio_inf )
-				return 0;
-
-			bio_group->_bio_inf_count = cons[1].count;
-
-			if ( !_bio_inf(bio_group->bio_inf + cons[1].len,
+			if ( !_bio_inf(bio_group->bio_inf +
+					bio_group->_bio_inf_count,
 					ptr, tag.ber_len) )
 				return 0;
-			cons[1].len++;
+			bio_group->_bio_inf_count++;
 			break;
 		default:
 			fprintf(stderr, "Unexpected tag\n");

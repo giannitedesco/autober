@@ -79,9 +79,18 @@ int autober_constraints(const struct autober_tag *tags,
 			 * they vary by type...
 			 */
 			cons[idx].count++;
-			cons[idx].len = tag.ber_len;
 			//printf("field[%u] fixed: %s: len = %u\n",
 			//	idx, atag->ab_label, cons[idx].len);
+		}
+		cons[idx].len = tag.ber_len;
+
+		if ( atag->ab_flags & AUTOBER_CHECK_SIZE ) {
+			if ( cons[idx].len < atag[idx].ab_size[0] ||
+				cons[idx].len > atag[idx].ab_size[1] ) {
+				fprintf(stderr, "%s violates size constraint\n",
+					atag->ab_label);
+				return 0;
+			}
 		}
 
 		ptr += tag.ber_len;
