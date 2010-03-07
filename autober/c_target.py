@@ -155,7 +155,7 @@ class TagDefinition:
 			f.write("\t\t.ab_size = {%u, %u},\n"%self.constraint)
 		f.write("\t\t.ab_tag = %s},\n"%self.tag_macro)
 
-class c_codec:
+class c_target:
 	def __define_tag(self, tname, name, tag):
 		self.__macro_tags.append((tag_macro(tname, name), "0x%x"%tag))
 

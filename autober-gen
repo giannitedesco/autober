@@ -10,13 +10,13 @@ if __name__ == '__main__':
 		p = parser.parse_tree()
 		ast = autober.semantics(p)
 
-		codec = autober.codec.c(ast)
-		h_file = "auto_" + codec.modname + ".h"
-		c_file = "auto_" + codec.modname + ".c"
+		target = autober.target.c(ast)
+		h_file = "auto_" + target.modname + ".h"
+		c_file = "auto_" + target.modname + ".c"
 		h = open(h_file, 'w')
 		#h = stdout
-		codec.write_header(h)
+		target.write_header(h)
 		c = open(c_file, 'w')
 		#c = stdout
-		codec.include(h_file)
-		codec.write_code(c)
+		target.include(h_file)
+		target.write_code(c)
