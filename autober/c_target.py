@@ -1,4 +1,14 @@
 from syntax import *
+from c_decls import *
+
+def type_lookup(fixed):
+	__typemap = {Octet: "uint8_t",
+			Uint8: "uint8_t",
+			Uint16: "uint16_t",
+			Uint32: "uint32_t",
+			Uint64: "uint64_t",
+			Blob: "struct autober_blob"}
+	return __typemap[fixed.__class__]
 
 def tag_macro(tname, name):
 	if tname == '':
@@ -7,104 +17,34 @@ def tag_macro(tname, name):
 		prefix = '_' + tname.upper()
 	return "TAG%s_%s"%(prefix, name.upper())
 
-class VarDeclaration:
-	def __getitem__(self):
-		raise IndexError
-	def __iter__(self):
-		return [].__iter__()
-		
-
-class CompoundDeclaration(VarDeclaration):
-	def __init__(self, tag, template, name = ''):
-		self.name = name
-		self.type = tag + " " + template.name
-		self.cname = template.name
-		self.__elem = []
-	def add(self, element):
-		self.__elem.append(element)
-	def __iter__(self):
-		return self.__elem.__iter__()
-	def __getitem__(self, idx):
-		return self.__elem[idx]
-	def __str__(self):
-		return self.type
-	def write(self, f, depth = 0):
-		tabs = "".join("\t" for i in range(depth))
-		f.write("%s%s {\n"%(tabs, self))
-		for e in self:
-			e.write(f, depth + 1)
-		f.write(tabs + "}%s;\n"%self.name)
-		pass
-
-class StructDeclaration(CompoundDeclaration):
-	def __init__(self, template, name = ''):
-		CompoundDeclaration.__init__(self, "struct", template, name)
-class UnionDeclaration(CompoundDeclaration):
-	def __init__(self, template, name = ''):
-		CompoundDeclaration.__init__(self, "union", template, name)
-
-class ScalarDeclaration(VarDeclaration):
-	def __init__(self, type, name, ptr = None, arraysz = None):
-		if type == "octet":
-			self.type = 'uint8_t'
-		elif type == "blob":
-			self.type = "struct autober_blob"
-		else:
-			self.type = type
-		self.name = name
-		self.cname = name
-		self.ptr = ptr
-		self.arraysz = arraysz
-	def __str__(self):
-		if self.arraysz == None:
-			ss = ''
-		else:
-			ss = '[%u]'%self.arraysz
-		return "%s %s%s%s;"%(self.type,
-					self.ptr and '*' or '',
-					self.name,
-					ss)
-	def write(self, f, depth = 0):
-		tabs = "".join("\t" for i in range(depth))
-		f.write(tabs + str(self) + "\n")
-
 def scalar(fixed):
 	if fixed.constraint != None:
-		arraysz = fixed.constraint[1]
+		arraysz = fixed.constraint[1] / fixed.bytes
+		if arraysz == 1:
+			arraysz = None
 	else:
 		arraysz = None
-	return ScalarDeclaration(str(fixed.type), fixed.name, None, arraysz)
+	return ScalarDeclaration(type_lookup(fixed), fixed.name, None, arraysz)
 
 def pointer_to(d, name):
 	return ScalarDeclaration(d.type, name, d)
 
 class TagDefinition:
-	__typemap = {"blob": "AUTOBER_TYPE_BLOB",
-			"octet": "AUTOBER_TYPE_OCTET",
-			"uint8_t": "AUTOBER_TYPE_INT",
-			"uint16_t": "AUTOBER_TYPE_INT",
-			"uint32_t": "AUTOBER_TYPE_INT",
-			"uint64_t": "AUTOBER_TYPE_INT",
+	__typemap = {Blob: "AUTOBER_TYPE_BLOB",
+			Octet: "AUTOBER_TYPE_OCTET",
+			Uint8: "AUTOBER_TYPE_INT",
+			Uint16: "AUTOBER_TYPE_INT",
+			Uint32: "AUTOBER_TYPE_INT",
+			Uint64: "AUTOBER_TYPE_INT",
 		}
-	__multiplier = {"blob": 0,
-			"octet": 1,
-			"uint8_t": 1,
-			"uint16_t": 2,
-			"uint32_t": 4,
-			"uint64_t": 8}
 
 	def __check_size(self, tag):
-		mult = self.__multiplier[str(tag.type)]
-		if 0 == mult:
+		try:
+			if self.constraint:
+				self.constraint = tag.constraint
+				self.check_size = True
+		except AttributeError:
 			return
-
-		if tag.constraint == None:
-			con = (1,1)
-		else:
-			con = tag.constraint
-
-		self.constraint = tuple(map(lambda x:x * mult, con))
-		self.check_size = True
 
 	def __init__(self, tag, union = False):
 		self.tag = tag.tag
@@ -119,14 +59,14 @@ class TagDefinition:
 				self.sequence = True
 			self.label = tag.label
 			self.type = None
-		elif tag.__class__ == Fixed:
+		elif Fixed in tag.__class__.__bases__:
 			self.template = False
 			self.optional = tag.optional
 			self.label = tag.name
-			self.type = self.__typemap[str(tag.type)]
+			self.type = self.__typemap[tag.__class__]
 			self.__check_size(tag)
 		else:
-			raise Exception("Unnion not permitted in tag block")
+			raise Exception("Union not permitted in tag block")
 	def __int__(self):
 		return self.tag
 	def __cmp__(a, b):
@@ -212,7 +152,6 @@ class c_target:
 		# setup attributes
 		self.ast = ast
 		self.parse = ast.parse_tree
-		self.parse.pretty_print()
 		assert(1 == len(self.parse))
 		self.root = self.parse[0]
 		self.modname = self.root.name.lower()

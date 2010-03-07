@@ -9,6 +9,7 @@ if __name__ == '__main__':
 		parser = autober.parser(lex)
 		p = parser.parse_tree()
 		ast = autober.semantics(p)
+		ast.parse_tree.pretty_print()
 
 		target = autober.target.c(ast)
 		h_file = "auto_" + target.modname + ".h"

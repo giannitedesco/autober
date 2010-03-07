@@ -14,6 +14,14 @@ class parser:
 	STATE_POP	= 9 # recurse
 	STATE_ADD	= 10 # add fixed item
 
+	__types 	= {"octet": Octet,
+				"uint8_t": Uint8,
+				"uint16_t": Uint16,
+				"uint32_t": Uint32,
+				"uint64_t": Uint64,
+				"blob": Blob,
+			}
+
 	def __template(self):
 		if self.__noconstruct:
 			return False
@@ -143,9 +151,22 @@ class parser:
 	def __f_add(self, tok):
 		if tok.__class__ != LexSemiColon:
 			raise Exception("Parse Error: %s")
-		fixd = Fixed(self.__tagno, self.__type,
-				self.__subscript, self.__name,
-				self.__optional)
+
+		try:
+			cls = self.__types[str(self.__type)]
+		except KeyError:
+			raise Exception("Unknown type: %s"%self.__type)
+
+		fixd = cls(self.__tagno, self.__name, self.__optional)
+
+		if self.__subscript:
+			ss = self.__subscript.get_subscript()
+			try:
+				fixd.set_subscript(ss)
+			except AttributeError:
+				raise Exception("%s type not subscriptable",
+						str(self.__type))
+
 		x = self.__stack.pop()
 		fixd.parent = x
 		if self.__optional or x.__class__ == Union:

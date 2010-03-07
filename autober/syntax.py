@@ -36,7 +36,7 @@ class Template(Root):
 			else:
 				raise Exception("Template arrays not supported")
 	def __str__(self):
-		return "T(%s)"%self.label
+		return "Template(%s)"%self.label
 	def __repr__(self):
 		return "Template(0x%x, '%s', %s)"%(self.tag,
 							self.name,
@@ -49,32 +49,83 @@ class Union(Root):
 		self.label = label
 		self.optindex = 0
 	def __str__(self):
-		return "U(%s)"%self.label
+		return "Union(%s)"%self.label
 	def __repr__(self):
 		return "Union('%s', '%s')"%(self.name, self.label)
 
 class Fixed:
-	def __init__(self, tag, type, subscript, name, optional = False):
+	def __init__(self, tag, name, optional = False):
 		self.tag = tag
-		self.type = type
 		self.name = name
 		self.optional = optional
-		if subscript:
-			ss = subscript.get_subscript()
-			if ss.__class__ == LexInteger:
-				min = max = int(ss)
-			elif ss.__class__ == LexIntRange:
-				(min, max) = ss 
-			else:
-				raise Exception("WTF %s"%ss)
-			self.constraint = (min, max)
-		else:
-			self.constraint = None
+		self.constraint = None
+		self.bytes = 0
 	def __iter__(self):
 		return [].__iter__()
 	def __str__(self):
 		return "F(%s)"%self.name
 	def __repr__(self):
-		return "Fixed(0x%x, '%s', '%s')"%(self.tag,
-							self.type,
+		return "Fixed(0x%x, '%s')"%(self.tag, self.name)
+
+class Uint(Fixed):
+	BITS_PER_BYTE		= 8
+
+	def __init__(self, tag, bits, name, optional = False):
+		Fixed.__init__(self, tag, name, optional)
+		assert((bits % self.BITS_PER_BYTE) == 0)
+		self.bits = bits
+		self.bytes = bits / self.BITS_PER_BYTE
+		self.constraint = (self.bytes, self.bytes)
+	def set_subscript(self, ss):
+		if ss.__class__ == LexInteger:
+			min = max = int(ss)
+		elif ss.__class__ == LexIntRange:
+			(min, max) = ss 
+		else:
+			raise Exception("WTF %s"%ss)
+		self.constraint = (min * self.bytes, max * self.bytes)
+	def __str__(self):
+		if (1, 1) == self.constraint:
+			return "Uint%u(%s)"%(self.bits, self.name)
+		elif self.constraint[0] == self.constraint[1]:
+			return "Uint%u[%u](%s)"%(self.bits,
+							self.constraint[0],
 							self.name)
+		else:
+			return "Uint%u[%u:%u](%s)"%(self.bits,
+							self.constraint[0],
+							self.constraint[1],
+							self.name)
+
+
+class Uint8(Uint,Fixed):
+	def __init__(self, tag, name, optional = False):
+		Uint.__init__(self, tag, 8, name, optional)
+class Octet(Uint,Fixed):
+	def __init__(self, tag, name, optional = False):
+		Uint.__init__(self, tag, 8, name, optional)
+	def __str__(self):
+		if (1, 1) == self.constraint:
+			return "Octet(%s)"%(self.name)
+		elif self.constraint[0] == self.constraint[1]:
+			return "Octet[%u](%s)"%(self.constraint[0],
+						self.name)
+		else:
+			return "Octet[%u:%u](%s)"%(self.constraint[0],
+							self.constraint[1],
+							self.name)
+class Uint16(Uint,Fixed):
+	def __init__(self, tag, name, optional = False):
+		Uint.__init__(self, tag, 16, name, optional)
+class Uint32(Uint,Fixed):
+	def __init__(self, tag, name, optional = False):
+		Uint.__init__(self, tag, 32, name, optional)
+class Uint64(Uint,Fixed):
+	def __init__(self, tag, name, optional = False):
+		Uint.__init__(self, tag, 64, name, optional)
+
+class Blob(Fixed):
+	def __init__(self, tag, name, optional = False):
+		Fixed.__init__(self, tag, name, optional)
+	def __str__(self):
+		return "Blob(%s)"%self.name
