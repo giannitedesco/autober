@@ -40,7 +40,7 @@ class TagDefinition:
 
 	def __check_size(self, tag):
 		try:
-			if self.constraint:
+			if tag.constraint:
 				self.constraint = tag.constraint
 				self.check_size = True
 		except AttributeError:
