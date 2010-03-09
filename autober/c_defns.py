@@ -38,8 +38,12 @@ class CContainer:
 		ret = []
 		for x in node:
 			name = self.prefix + x.name
-			if x.__class__ == Template and x.sequence:
+			if x.__class__ != Template:
+				continue
+			if x.sequence:
 				ret.append((name, CStructPtr(x)))
+			else:
+				ret.extend(self.__ptrs(x))
 		return ret
 
 	def __unions(self, node):
@@ -106,9 +110,8 @@ class CStructPtr(CDefn,CContainer):
 		f.write("{\n")
 		if len(self.ptrs):
 			f.write("\tunsigned int i;\n\n");
-		if self.is_root:
-			f.write("\tif ( NULL == %s )\n"%str(self))
-			f.write("\t\treturn;\n\n")
+		f.write("\tif ( NULL == %s )\n"%str(self))
+		f.write("\t\treturn;\n\n")
 
 		for (n, x) in self.ptrs:
 			f.write("\tfor(i = 0; i < %s%s; i++)\n"%(
@@ -135,6 +138,7 @@ class CDefinitions:
 		for (n, x) in node.ptrs:
 			print "%s%s"%(indent, n)
 			self.__do_print(x, depth + 1)
+		# TODO: print unions
 			
 	def pretty_print(self):
 		print str(self.root)
