@@ -1,6 +1,85 @@
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <ctype.h>
 #include <gber.h>
+
+static void hex_dumpf_r(FILE *f, const uint8_t *tmp, size_t len,
+			size_t llen, unsigned int depth)
+{
+	size_t i, j;
+	size_t line;
+
+	for(j = 0; j < len; j += line, tmp += line) {
+		if ( j + llen > len ) {
+			line = len - j;
+		}else{
+			line = llen;
+		}
+
+		fprintf(f, "%*c%05x : ", depth, ' ', j);
+
+		for(i = 0; i < line; i++) {
+			if ( isprint(tmp[i]) ) {
+				fprintf(f, "%c", tmp[i]);
+			}else{
+				fprintf(f, ".");
+			}
+		}
+
+		for(; i < llen; i++)
+			fprintf(f, " ");
+
+		for(i=0; i < line; i++)
+			fprintf(f, " %02x", tmp[i]);
+
+		fprintf(f, "\n");
+	}
+	fprintf(f, "\n");
+}
+
+static int do_ber_dump(FILE *f, const uint8_t *ptr, size_t len,
+			unsigned int depth)
+{
+	const uint8_t *end = ptr + len;
+
+	while(ptr < end) {
+		struct gber_tag tag;
+		ptr = ber_decode_tag(&tag, ptr, end - ptr);
+		if ( NULL == ptr )
+			return 0;
+
+		fprintf(f, "%*c.tag = %x\n", depth, ' ', tag.ber_tag);
+		fprintf(f, "%*c.class = %s\n", depth, ' ',
+			ber_id_octet_clsname(tag.ber_id));
+		fprintf(f, "%*c.constructed = %s\n", depth, ' ',
+			ber_id_octet_constructed(tag.ber_id) ? "yes" : "no");
+
+		fprintf(f, "%*c.len = %u (0x%.2x)\n",
+			depth, ' ', tag.ber_len, tag.ber_len);
+
+		if ( ber_id_octet_constructed(tag.ber_id) ) {
+			if ( !do_ber_dump(f, ptr, tag.ber_len, depth + 1) )
+				return 0;
+		}else{
+			hex_dumpf_r(f, ptr, tag.ber_len, 16, depth + 1);
+		}
+
+		ptr += tag.ber_len;
+	}
+
+	return 1;
+}
+
+int ber_dump(const uint8_t *ptr, size_t len)
+{
+	return do_ber_dump(stdout, ptr, len, 1);
+}
+
+int ber_dumpf(FILE *f, const uint8_t *ptr, size_t len)
+{
+	return do_ber_dump(f, ptr, len, 1);
+}
 
 const char * const ber_id_octet_clsname(uint8_t id)
 {

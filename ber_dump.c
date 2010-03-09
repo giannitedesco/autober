@@ -4,7 +4,6 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
-#include <ctype.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -17,40 +16,6 @@ static const char *cmd;
 static const char *sys_err(void)
 {
 	return strerror(errno);
-}
-
-static void hex_dump(const uint8_t *tmp, size_t len,
-			size_t llen, unsigned int depth)
-{
-	size_t i, j;
-	size_t line;
-
-	for(j = 0; j < len; j += line, tmp += line) {
-		if ( j + llen > len ) {
-			line = len - j;
-		}else{
-			line = llen;
-		}
-
-		printf("%*c%05x : ", depth, ' ', j);
-
-		for(i = 0; i < line; i++) {
-			if ( isprint(tmp[i]) ) {
-				printf("%c", tmp[i]);
-			}else{
-				printf(".");
-			}
-		}
-
-		for(; i < llen; i++)
-			printf(" ");
-
-		for(i=0; i < line; i++)
-			printf(" %02x", tmp[i]);
-
-		printf("\n");
-	}
-	printf("\n");
 }
 
 static int mapfile(int fd, const uint8_t **begin, size_t *sz)
@@ -71,38 +36,6 @@ static int mapfile(int fd, const uint8_t **begin, size_t *sz)
 	return 1;
 }
 
-static int ber_dump(const uint8_t *ptr, size_t len, unsigned int depth)
-{
-	const uint8_t *end = ptr + len;
-
-	while(ptr < end) {
-		struct gber_tag tag;
-		ptr = ber_decode_tag(&tag, ptr, end - ptr);
-		if ( NULL == ptr )
-			return 0;
-
-		printf("%*c.tag: %x\n", depth, ' ', tag.ber_tag);
-		printf("%*c o class: %s\n", depth, ' ',
-			ber_id_octet_clsname(tag.ber_id));
-		printf("%*c o constructed: %s\n", depth, ' ',
-			ber_id_octet_constructed(tag.ber_id) ? "yes" : "no");
-
-		printf("%*c.len = %u (0x%.2x)\n",
-			depth, ' ', tag.ber_len, tag.ber_len);
-
-		if ( ber_id_octet_constructed(tag.ber_id) ) {
-			if ( !ber_dump(ptr, tag.ber_len, depth + 1) )
-				return 0;
-		}else{
-			hex_dump(ptr, tag.ber_len, 16, depth + 1);
-		}
-
-		ptr += tag.ber_len;
-	}
-
-	return 1;
-}
-
 static int do_file(char *fn, int fd)
 {
 	const uint8_t *map;
@@ -114,7 +47,7 @@ static int do_file(char *fn, int fd)
 		return 0;
 	}
 
-	if ( !ber_dump(map, sz, 0) ) {
+	if ( !ber_dump(map, sz) ) {
 		fprintf(stderr, "%s: %s: malformed BER encoding\n", cmd, fn);
 	}
 

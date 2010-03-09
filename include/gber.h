@@ -26,5 +26,7 @@ const uint8_t *ber_decode_tag(struct gber_tag *tag,
 unsigned int ber_id_octet_constructed(uint8_t id);
 unsigned int ber_id_octet_class(uint8_t id);
 const char * const ber_id_octet_clsname(uint8_t id);
+int ber_dump(const uint8_t *ptr, size_t len);
+int ber_dumpf(FILE *f, const uint8_t *ptr, size_t len);
 
 #endif /* _GBER_H */
