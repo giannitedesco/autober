@@ -71,14 +71,16 @@ static const struct autober_tag bio_hdr_tags[] = {
 
 static void *do_free(struct bio_group *bio_group)
 {
+	unsigned int i;
+
 	if ( bio_group ) {
-		if ( bio_group->bio_inf ) {
-			switch(bio_group->bio_inf->_bdb_type) {
+		for(i = 0; i < bio_group->_bio_inf_count; i++)  {
+			switch(bio_group->bio_inf[i]._bdb_type) {
 			case BIO_INF_BDB_TYPE_BDB_NC:
-				free(bio_group->bio_inf->bdb.bdb_nc.ptr);
+				free(bio_group->bio_inf[i].bdb.bdb_nc.ptr);
 				break;
 			case BIO_INF_BDB_TYPE_BDB_C:
-				free(bio_group->bio_inf->bdb.bdb_c.ptr);
+				free(bio_group->bio_inf[i].bdb.bdb_c.ptr);
 				break;
 			default:
 				break;
