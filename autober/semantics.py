@@ -51,6 +51,8 @@ class semantics:
 		self.templates = self.__tmplsym_map()
 
 		# 2. Check union tags don't conflict with parent template
+		# TODO: check union doesnt have a union in toplevel because
+		#     it makes no fucking sense
 		self.unions = self.__check_unions()
 
 		# 3. Check variable names valid C tokens
