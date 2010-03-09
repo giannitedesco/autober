@@ -113,6 +113,7 @@ class c_target:
 			struct = UnionDeclaration(node, name)
 		else:
 			struct = StructDeclaration(node, name)
+		opts = False
 		for x in node:
 			if x.__class__ == Template:
 				self.__define_tag(node.name, x.name, x.tag)
@@ -139,8 +140,12 @@ class c_target:
 				elif x.optional:
 					self.__define_opt(node.name, x.name,
 								x.optindex)
+					opts = True
 				self.__define_tag(node.name, x.name, x.tag)
 				struct.add(scalar(x))
+		if opts:
+			struct.add(ScalarDeclaration("unsigned int",
+							"_present"))
 		return struct
 
 	def __build_structs(self, node):

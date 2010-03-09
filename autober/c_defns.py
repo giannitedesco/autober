@@ -1,22 +1,32 @@
 from syntax import *
 
 class CDefn:
-	pass
-class CScalar(CDefn):
 	def __init__(self, node):
 		self.name = node.name
+
+class CScalar(CDefn):
+	def __init__(self, node, parent):
+		CDefn.__init__(self, node)
+		self.optional = node.optional
+		if self.optional:
+			self.optmacro = "%s_%s"%(parent.name.upper(),
+						self.name.upper())
 		if node.__class__ == Blob:
 			self.is_blob = True
 		else:
 			self.is_blob = False
-	def call_free(self, f, name, indent = 1):
+	def call_free(self, f, parent, name, indent = 1):
 		if not self.is_blob:
 			return
-		f.write("%sfree(%s.ptr);\n"%(\
-			''.join("\t" for i in range(indent)),
-			name))
+		tabs = ''.join("\t" for i in range(indent))
+		if self.optional:
+			# not strictly necessary since we calloc
+			f.write(tabs + "if ( %s->_present & %s )\n"%(parent,
+					self.optmacro))
+			tabs += "\t"
+		f.write(tabs + "free(%s%s.ptr);\n"%(parent, name))
 
-class CContainer:
+class CContainer(CDefn):
 	def __scalar(self, node, prefix = '', toplevel = False):
 		ret = []
 		for x in node:
@@ -25,13 +35,12 @@ class CContainer:
 			else:
 				name = prefix + '.' + x.name
 			if Fixed in x.__class__.__bases__:
-				r = [(name, CScalar(x))]
+				r = [(name, CScalar(x, parent = self))]
 			elif x.__class__ == Template and not x.sequence:
 				r = self.__scalar(x, prefix = name)
 			else:
 				continue
 			ret.extend(r)
-			self.toplevel.extend(r)
 		return ret
 
 	def __ptrs(self, node):
@@ -59,17 +68,18 @@ class CContainer:
 		return self.name
 
 	def __init__(self, node, prefix = '.', root = False):
+		CDefn.__init__(self, node)
 		self.is_root = root
 		self.prefix = prefix
 		if not root:
 			self.count_var = "%s_%s_count"%(self.prefix, node.name)
-		self.name = node.name
 		self.toplevel = []
 		self.scalar = self.__scalar(node, toplevel = True)
 		self.ptrs = self.__ptrs(node)
 		self.unions = self.__unions(node)
+		self.toplevel.extend(self.scalar)
 		self.toplevel.extend(self.ptrs)
-		self.toplevel.extend(self.ptrs)
+		self.toplevel.extend(self.unions)
 
 class CUnion(CDefn,CContainer):
 	def __init__(self, parent, node, prefix = '.'):
@@ -87,7 +97,7 @@ class CUnion(CDefn,CContainer):
 		for k in keys:
 			f.write("%scase %s:\n"%(tabs, k))
 			(n, x) = self.choices[k]
-			x.call_free(f, str(parent) + name + n,
+			x.call_free(f, parent, name + n,
 					indent = indent + 1)
 			f.write("%s\tbreak;\n"%tabs)
 		f.write("%s}\n"%tabs);
@@ -116,15 +126,13 @@ class CStructPtr(CDefn,CContainer):
 		for (n, x) in self.ptrs:
 			f.write("\tfor(i = 0; i < %s%s; i++)\n"%(
 						str(self), x.count_var))
-			#f.write("\t\t_free_%s(&%s%s[i]);\n"%(str(x),
-			#				str(self), n))
 			x.call_free(f, "%s%s"%(str(self), n), indent = 2)
 			f.write("\tfree(%s%s);\n\n"%(str(self), n))
 
 		for (n, x) in self.unions:
 			x.write_free(f, str(self), n)
 		for (n, x) in self.scalar:
-			x.call_free(f, "%s%s"%(str(self), n))
+			x.call_free(f, self, n)
 
 		if self.is_root:
 			f.write("\tfree(%s);\n"%str(self))
