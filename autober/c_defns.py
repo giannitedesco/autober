@@ -190,6 +190,8 @@ class CContainer(CDefn):
 			x.write_free(f, str(self), n)
 		for (n, x) in self.scalars:
 			x.call_free(f, self, n)
+		for (n, x) in self.structs:
+			x.call_free(f, n)
 
 		if self.is_root:
 			f.write("\tfree(%s);\n"%str(self))
