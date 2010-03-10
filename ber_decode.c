@@ -112,7 +112,7 @@ static uint8_t ber_len_short(uint8_t lb)
 	return lb & ~0x80;
 }
 
-const uint8_t *ber_decode_tag(struct gber_tag *tag,
+static const uint8_t *do_decode_tag(struct gber_tag *tag,
 				const uint8_t *ptr, size_t len)
 {
 	const uint8_t *end = ptr + len;
@@ -148,8 +148,21 @@ const uint8_t *ber_decode_tag(struct gber_tag *tag,
 		}
 	}
 
-	if ( ptr + tag->ber_len > end )
-		return NULL;
+	return ptr;
+}
 
+const uint8_t *ber_tag_info(struct gber_tag *tag,
+				const uint8_t *ptr, size_t len)
+{
+	return do_decode_tag(tag, ptr, len);
+}
+
+const uint8_t *ber_decode_tag(struct gber_tag *tag,
+				const uint8_t *ptr, size_t len)
+{
+	const uint8_t *end = ptr + len;
+	ptr = do_decode_tag(tag, ptr, len);
+	if ( NULL == ptr || ptr + tag->ber_len > end )
+		return NULL;
 	return ptr;
 }
