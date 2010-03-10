@@ -3,6 +3,7 @@ from syntax import *
 class CDefn:
 	def __init__(self, node, parent):
 		self.name = node.name
+		self.parent = parent
 		if parent:
 			self.tagname = "TAG_%s_%s"%(parent.name.upper(),
 							self.name.upper())
@@ -76,31 +77,17 @@ class CScalar(CDefn):
 		f.write(tabs + "\treturn 0;\n")
 
 class CContainer(CDefn):
-	def __scalar(self, node, prefix = '', toplevel = True):
-		ret = []
-		for (n, x) in node:
-			if x.__class__ == CScalar:
-				ret.append((n,x))
-			elif x.__class__ == CStruct:
-				ret.extend(self.__scalar(x, prefix = n,
-						toplevel = False))
-		return ret
-
-	def __ptrs(self, node, prefix = '', toplevel = True):
-		ret = []
-		for (n, x) in node:
-			if x.__class__ == CStructPtr:
-				ret.append((n,x))
-			elif x.__class__ == CStruct:
-				ret.extend(self.__ptrs(x, prefix = n,
-						toplevel = False))
-		return ret
-
 	def __unions(self):
 		return filter(lambda x:x[1].__class__ == CUnion, self)
 
 	def __structs(self):
 		return filter(lambda x:x[1].__class__ == CStruct, self)
+
+	def __sequences(self):
+		return filter(lambda x:x[1].__class__ == CStructPtr, self)
+
+	def __scalars(self):
+		return filter(lambda x:x[1].__class__ == CScalar, self)
 
 	def __toplevel(self, node):
 		ret = []
@@ -142,14 +129,50 @@ class CContainer(CDefn):
 		self.prefix = prefix
 		self.toplevel = []
 		self.toplevel = self.__toplevel(node)
-		self.scalar = self.__scalar(self)
-		self.ptrs = self.__ptrs(self)
 		self.unions = self.__unions()
 		self.structs = self.__structs()
+		self.sequences = self.__sequences()
+		self.scalars = self.__scalars()
 		self.subtags = self.__subtags()
 
+	def call_free(self, f, name, indent = 1):
+		tabs = ''.join("\t" for i in range(indent))
+		if self.is_root:
+			f.write("%s_free_%s(%s);\n"%(tabs, self.name, name))
+		else:
+			f.write("%s_free_%s(&%s[i]);\n"%(tabs, self.name, name))
+
+	def write_free(self, f):
+		for (n, x) in self.structs + self.sequences:
+			x.write_free(f)
+		f.write("static void _free_%s(struct %s *%s)\n"%(str(self),
+								str(self),
+								str(self)))
+		f.write("{\n")
+		if len(self.sequences):
+			f.write("\tunsigned int i;\n\n");
+
+		if self.alloc:
+			f.write("\tif ( NULL == %s )\n"%str(self))
+			f.write("\t\treturn;\n\n")
+
+		for (n, x) in self.sequences:
+			f.write("\tfor(i = 0; i < %s%s; i++)\n"%(
+						str(self), x.count_var))
+			x.call_free(f, "%s%s"%(str(self), n), indent = 2)
+			f.write("\tfree(%s%s);\n\n"%(str(self), n))
+
+		for (n, x) in self.unions:
+			x.write_free(f, str(self), n)
+		for (n, x) in self.scalars:
+			x.call_free(f, self, n)
+
+		if self.is_root:
+			f.write("\tfree(%s);\n"%str(self))
+		f.write("}\n\n")
+
 	def write_decode(self, f):
-		for (n, x) in self.ptrs:
+		for (n, x) in self.sequences:
 			x.write_decode(f)
 		for (n, x) in self.structs:
 			x.write_decode(f)
@@ -171,7 +194,14 @@ class CContainer(CDefn):
 		f.write("\t\treturn 0;\n")
 		f.write("\t}\n\n")
 
-		# TODO: Check one or more union members set
+		# TODO: Check one union members set
+
+		# FIXME:use correct count
+		for (n, x) in self.sequences:
+			f.write("\t%s%s = calloc(1, sizeof(*%s%s));\n"%(
+				self, n, self, n))
+			f.write("\tif ( NULL == %s%s )\n"%(self, n))
+			f.write("\t\treturn 0;\n\n")
 
 		f.write("\tfor(end = ptr + len; ptr < end; "\
 			"ptr += tag.ber_len) {\n")
@@ -223,6 +253,7 @@ class CStruct(CContainer,CDefn):
 	def __init__(self, node, parent):
 		CContainer.__init__(self, node, parent, prefix = '->')
 		self.tag = node.tag
+		self.alloc = False
 	def call_decode(self, f, name, indent = 1):
 		tabs = "".join("\t" for i in range(indent))
 		f.write(tabs + "if ( !_decode_%s(&%s, ptr, tag.ber_len) )\n"%(
@@ -233,51 +264,18 @@ class CStructPtr(CContainer,CDefn):
 	def __init__(self, node, parent):
 		CContainer.__init__(self, node, parent, prefix = '->')
 		self.tag = node.tag
+		self.alloc = True
 		if not self.is_root:
 			self.count_var = "%s_%s_count"%(self.prefix, node.name)
-			self.pname = str(parent)
-
-	def call_free(self, f, name, indent = 1):
-		tabs = ''.join("\t" for i in range(indent))
-		if self.is_root:
-			f.write("%s_free_%s(%s);\n"%(tabs, self.name, name))
-		else:
-			f.write("%s_free_%s(&%s[i]);\n"%(tabs, self.name, name))
-
-	def write_free(self, f):
-		for (n, x) in self.ptrs:
-			x.write_free(f)
-		f.write("static void _free_%s(struct %s *%s)\n"%(str(self),
-								str(self),
-								str(self)))
-		f.write("{\n")
-		if len(self.ptrs):
-			f.write("\tunsigned int i;\n\n");
-		f.write("\tif ( NULL == %s )\n"%str(self))
-		f.write("\t\treturn;\n\n")
-
-		for (n, x) in self.ptrs:
-			f.write("\tfor(i = 0; i < %s%s; i++)\n"%(
-						str(self), x.count_var))
-			x.call_free(f, "%s%s"%(str(self), n), indent = 2)
-			f.write("\tfree(%s%s);\n\n"%(str(self), n))
-
-		for (n, x) in self.unions:
-			x.write_free(f, str(self), n)
-		for (n, x) in self.scalar:
-			x.call_free(f, self, n)
-
-		if self.is_root:
-			f.write("\tfree(%s);\n"%str(self))
-		f.write("}\n\n")
 
 	def call_decode(self, f, name, indent = 1):
 		tabs = "".join("\t" for i in range(indent))
 		f.write(tabs + "if ( !_decode_%s(&%s[%s%s], " \
 				"ptr, tag.ber_len) )\n"%(
-				self.name, name, self.pname, self.count_var))
+				self.name, name, str(self.parent),
+				self.count_var))
 		f.write(tabs + "\treturn 0;\n")
-		f.write(tabs + "%s%s++;\n"%(self.pname, self.count_var))
+		f.write(tabs + "%s%s++;\n"%(str(self.parent), self.count_var))
 
 
 class CDefinitions:
