@@ -14,18 +14,31 @@ class CDefn:
 		raise IndexError
 
 class CScalar(CDefn):
+	TYPE_OCTET		= 0
+	TYPE_U8			= 1
+	TYPE_U16		= 2
+	TYPE_U32		= 3
+	TYPE_U64		= 4
+	TYPE_BLOB		= 5
 	def __init__(self, node, parent):
+		typemap = {Octet: self.TYPE_OCTET,
+				Uint8: self.TYPE_U8,
+				Uint16: self.TYPE_U16,
+				Uint32: self.TYPE_U32,
+				Blob: self.TYPE_BLOB}
 		CDefn.__init__(self, node, parent)
+		self.tag = node.tag
 		self.optional = node.optional
+		self.is_array = False
+		if node.constraint != None and \
+			node.constraint[1] / node.bytes > 1:
+			self.is_array = True
 		if self.optional:
 			self.optmacro = "%s_%s"%(parent.name.upper(),
 						self.name.upper())
-		if node.__class__ == Blob:
-			self.is_blob = True
-		else:
-			self.is_blob = False
+		self.type = typemap[node.__class__]
 	def call_free(self, f, parent, name, indent = 1):
-		if not self.is_blob:
+		if self.type != self.TYPE_BLOB:
 			return
 		tabs = ''.join("\t" for i in range(indent))
 		if self.optional:
@@ -35,9 +48,32 @@ class CScalar(CDefn):
 			tabs += "\t"
 		f.write(tabs + "free(%s%s.ptr);\n"%(parent, name))
 
+	def __octet(self, f, tabs, name):
+		f.write(tabs + "if ( !autober_octet(%s, &tag, ptr) )\n"%(name))
+	def __uint8(self, f, tabs, name):
+		f.write(tabs + "if ( !autober_u8(%s, &tag, ptr) )\n"%(name))
+	def __uint16(self, f, tabs, name):
+		f.write(tabs + "if ( !autober_u16(%s, &tag, ptr) )\n"%(name))
+	def __uint32(self, f, tabs, name):
+		f.write(tabs + "if ( !autober_u32(%s, &tag, ptr) )\n"%(name))
+	def __uint64(self, f, tabs, name):
+		f.write(tabs + "if ( !autober_u64(%s, &tag, ptr) )\n"%(name))
+	def __blob(self, f, tabs, name):
+		f.write(tabs + "if ( !autober_blob(%s, &tag, ptr) )\n"%(name))
+		
 	def call_decode(self, f, name, indent = 1):
+		decodemap = {self.TYPE_OCTET: self.__octet,
+				self.TYPE_U8: self.__uint8,
+				self.TYPE_U16: self.__uint16,
+				self.TYPE_U32: self.__uint32,
+				self.TYPE_U64: self.__uint64,
+				self.TYPE_BLOB: self.__blob,
+				}
 		tabs = "".join("\t" for i in range(indent))
-		f.write(tabs + "&%s;\n"%(name))
+		if not self.is_array:
+			name = "&" + name
+		decodemap[self.type](f, tabs, name)
+		f.write(tabs + "\treturn 0;\n")
 
 class CContainer(CDefn):
 	def __scalar(self, node, prefix = '', toplevel = True):
@@ -60,19 +96,11 @@ class CContainer(CDefn):
 						toplevel = False))
 		return ret
 
-	def __unions(self, node):
-		ret = []
-		for (n, x) in node:
-			if x.__class__ == CUnion:
-				ret.append((n, x))
-		return ret
+	def __unions(self):
+		return filter(lambda x:x[1].__class__ == CUnion, self)
 
-	def __structs(self, node):
-		ret = []
-		for (n, x) in node:
-			if x.__class__ == CStruct:
-				ret.append((n, x))
-		return ret
+	def __structs(self):
+		return filter(lambda x:x[1].__class__ == CStruct, self)
 
 	def __toplevel(self, node):
 		ret = []
@@ -89,6 +117,13 @@ class CContainer(CDefn):
 				obj = (n, CScalar(x, self))
 			ret.append(obj)
 		return ret
+	
+	def __subtags(self):
+		ret = filter(lambda x:x[1].__class__ != CUnion, self)
+		for (n, x) in self.unions:
+			for (nn, xx) in x:
+				ret.append((n + nn, xx))
+		return ret;
 
 	def __iter__(self):
 		return self.toplevel.__iter__()
@@ -109,8 +144,9 @@ class CContainer(CDefn):
 		self.toplevel = self.__toplevel(node)
 		self.scalar = self.__scalar(self)
 		self.ptrs = self.__ptrs(self)
-		self.unions = self.__unions(self)
-		self.structs = self.__structs(self)
+		self.unions = self.__unions()
+		self.structs = self.__structs()
+		self.subtags = self.__subtags()
 
 	def write_decode(self, f):
 		for (n, x) in self.ptrs:
@@ -143,18 +179,12 @@ class CContainer(CDefn):
 		f.write("\t\tif ( NULL == ptr )\n")
 		f.write("\t\t\treturn 0;\n\n")
 		f.write("\t\tswitch(tag.ber_tag) {\n")
-		for (n, x) in self.toplevel:
+		for (n, x) in self.subtags:
 			if x.__class__ == CUnion:
 				continue
 			f.write("\t\tcase %s:\n"%x.tagname)
 			x.call_decode(f, str(self) + n, indent = 3)
 			f.write("\t\t\tbreak;\n");
-		for (n, x) in self.unions:
-			for (nn, xx) in x:
-				f.write("\t\tcase %s:\n"%xx.tagname)
-				xx.call_decode(f, str(self) + n + nn,
-						indent = 3)
-				f.write("\t\t\tbreak;\n");
 		f.write("\t\tdefault:\n")
 		f.write("\t\t\tfprintf(stderr, \"Unexpected tag\\n\");\n")
 		f.write("\t\t\treturn 0;\n")
@@ -192,14 +222,17 @@ class CUnion(CContainer, CDefn):
 class CStruct(CContainer,CDefn):
 	def __init__(self, node, parent):
 		CContainer.__init__(self, node, parent, prefix = '->')
+		self.tag = node.tag
 	def call_decode(self, f, name, indent = 1):
 		tabs = "".join("\t" for i in range(indent))
-		f.write(tabs + "_decode_%s(&%s, ptr, tag.ber_len);\n"%(
+		f.write(tabs + "if ( !_decode_%s(&%s, ptr, tag.ber_len) )\n"%(
 			self.name, name))
+		f.write(tabs + "\treturn 0;\n")
 
 class CStructPtr(CContainer,CDefn):
 	def __init__(self, node, parent):
 		CContainer.__init__(self, node, parent, prefix = '->')
+		self.tag = node.tag
 		if not self.is_root:
 			self.count_var = "%s_%s_count"%(self.prefix, node.name)
 			self.pname = str(parent)
@@ -240,8 +273,11 @@ class CStructPtr(CContainer,CDefn):
 
 	def call_decode(self, f, name, indent = 1):
 		tabs = "".join("\t" for i in range(indent))
-		f.write(tabs + "_decode_%s(&%s[%s%s], ptr, tag.ber_len);\n"%(
-			self.name, name, self.pname, self.count_var))
+		f.write(tabs + "if ( !_decode_%s(&%s[%s%s], " \
+				"ptr, tag.ber_len) )\n"%(
+				self.name, name, self.pname, self.count_var))
+		f.write(tabs + "\treturn 0;\n")
+		f.write(tabs + "%s%s++;\n"%(self.pname, self.count_var))
 
 
 class CDefinitions:
