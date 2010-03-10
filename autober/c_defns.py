@@ -415,7 +415,7 @@ class CDefinitions:
 
 	def write_free(self, f):
 		self.root.write_free(f)
-		f.write("void free_%s(struct %s *%s)\n"%(str(self.root),
+		f.write("void %s_free(struct %s *%s)\n"%(str(self.root),
 							str(self.root),
 							str(self.root)))
 		f.write("{\n")
