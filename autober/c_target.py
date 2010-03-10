@@ -242,3 +242,4 @@ class c_target:
 		f.write("\n")
 		self.__write_tagblocks(f)
 		self.__defns.write_free(f)
+		self.__defns.write_decode(f)
