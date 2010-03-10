@@ -13,6 +13,13 @@ class CDefn:
 		return [].__iter__()
 	def __getitem__(self, idx):
 		raise IndexError
+	def tag_macro(self):
+		if not self.parent:
+			prefix = ''
+		else:
+			prefix = '_' + self.parent.name.upper()
+		return "TAG%s_%s"%(prefix, self.name.upper())
+
 
 class CScalar(CDefn):
 	TYPE_OCTET		= 0
@@ -30,10 +37,15 @@ class CScalar(CDefn):
 		CDefn.__init__(self, node, parent)
 		self.tag = node.tag
 		self.optional = node.optional
-		self.is_array = False
-		if node.constraint != None and \
-			node.constraint[1] / node.bytes > 1:
-			self.is_array = True
+		if node.constraint != None:
+			self.constraint = node.constraint
+			if self.constraint[1] / node.bytes > 1:
+				self.is_array = True
+			else:
+				self.is_array = False
+		else:
+			self.constraint = None
+			self.is_array = False
 		if self.optional:
 			self.optmacro = "%s_%s"%(parent.name.upper(),
 						self.name.upper())
@@ -112,6 +124,16 @@ class CContainer(CDefn):
 				ret.append((n + nn, xx))
 		return ret;
 
+	def __tagblocks(self):
+		nu = filter(lambda x:x[1].__class__ != CUnion, self)
+		ret = []
+		for (n, x) in nu:
+			ret.append((x, False))
+		for (n, x) in self.unions:
+			for (nn, xx) in x:
+				ret.append((xx, True))
+		return map(lambda x:TagDefinition(x[0], union=x[1]), ret);
+
 	def __iter__(self):
 		return self.toplevel.__iter__()
 	def __getitem__(self, idx):
@@ -134,6 +156,8 @@ class CContainer(CDefn):
 		self.sequences = self.__sequences()
 		self.scalars = self.__scalars()
 		self.subtags = self.__subtags()
+		self.tagblocks = self.__tagblocks()
+		self.tagblocks.sort()
 
 	def call_free(self, f, name, indent = 1):
 		tabs = ''.join("\t" for i in range(indent))
@@ -224,6 +248,9 @@ class CContainer(CDefn):
 		f.write("\treturn 0;\n")
 		f.write("}\n\n")
 		return
+	
+	def write_tagblock(self, f):
+		map(lambda x:x.write(f), self.tagblocks)
 
 class CUnion(CContainer, CDefn):
 	def __init__(self, node, parent, prefix = '.'):
@@ -248,12 +275,15 @@ class CUnion(CContainer, CDefn):
 		return
 	def write_decode(self, f):
 		raise Exception("WTF")
+	def write_tagblock(self, f):
+		raise Exception("WTF")
 
 class CStruct(CContainer,CDefn):
 	def __init__(self, node, parent):
 		CContainer.__init__(self, node, parent, prefix = '->')
 		self.tag = node.tag
 		self.alloc = False
+		self.label = node.label
 	def call_decode(self, f, name, indent = 1):
 		tabs = "".join("\t" for i in range(indent))
 		f.write(tabs + "if ( !_decode_%s(&%s, ptr, tag.ber_len) )\n"%(
@@ -265,6 +295,7 @@ class CStructPtr(CContainer,CDefn):
 		CContainer.__init__(self, node, parent, prefix = '->')
 		self.tag = node.tag
 		self.alloc = True
+		self.label = node.label
 		if not self.is_root:
 			self.count_var = "%s_%s_count"%(self.prefix, node.name)
 
@@ -277,6 +308,64 @@ class CStructPtr(CContainer,CDefn):
 		f.write(tabs + "\treturn 0;\n")
 		f.write(tabs + "%s%s++;\n"%(str(self.parent), self.count_var))
 
+class TagDefinition:
+	__typemap = {CScalar.TYPE_BLOB: "AUTOBER_TYPE_BLOB",
+			CScalar.TYPE_OCTET: "AUTOBER_TYPE_OCTET",
+			CScalar.TYPE_U8: "AUTOBER_TYPE_INT",
+			CScalar.TYPE_U16: "AUTOBER_TYPE_INT",
+			CScalar.TYPE_U32: "AUTOBER_TYPE_INT",
+			CScalar.TYPE_U64: "AUTOBER_TYPE_INT",
+		}
+
+	def __init__(self, item, union = False):
+		self.item = item
+		self.union = union
+		self.check_size = False
+		self.sequence = False
+		if item.__class__ in [CStruct, CStructPtr]:
+			self.template = True
+			self.optional = False
+			if item.__class__ == CStructPtr:
+				self.sequence = True
+			self.label = item.label
+			self.type = None
+		elif item.__class__ == CScalar:
+			self.template = False
+			self.optional = item.optional
+			self.label = item.name
+			self.type = self.__typemap[item.type]
+			self.constraint = item.constraint
+			self.check_size = (self.constraint != None)
+		else:
+			raise Exception("Union not permitted in tag block")
+	def __int__(self):
+		return self.item.tag
+	def __cmp__(a, b):
+		return int(a) - int(b)
+	def flags(self):
+		list = []
+		if self.template:
+			list.append("AUTOBER_TEMPLATE")
+		if self.union:
+			list.append("AUTOBER_UNION")
+		if self.sequence:
+			list.append("AUTOBER_SEQUENCE")
+		if self.optional:
+			list.append("AUTOBER_OPTIONAL")
+		if self.check_size:
+			list.append("AUTOBER_CHECK_SIZE")
+		return "|".join(list)
+
+	def write(self, f):
+		f.write("\t{.ab_label = \"%s\",\n"%self.label)
+		if self.type != None:
+			f.write("\t\t.ab_type = %s,\n"%self.type)
+		if self.flags() != '':
+			f.write("\t\t.ab_flags = %s,\n"%self.flags())
+		if self.check_size:
+			f.write("\t\t.ab_size = {%u, %u},\n"%self.constraint)
+		f.write("\t\t.ab_tag = %s},\n"%self.item.tag_macro())
+
 
 class CDefinitions:
 	def __do_print(self, node, depth = 0):
@@ -288,6 +377,41 @@ class CDefinitions:
 	def pretty_print(self):
 		print str(self.root)
 		self.__do_print(self.root, 1)
+
+	def __write_tagblock(self, f, node):
+		for (n, x) in node.structs + node.sequences:
+			self.__write_tagblock(f, x)
+		f.write("/* Tags for %s */\n"%node.label)
+		f.write("static const struct autober_tag %s_tags[] = {\n"%\
+			str(node));
+		node.write_tagblock(f)
+		f.write("};\n\n")
+
+	def write_tagblocks(self, f):
+		self.__write_tagblock(f, self.root)
+
+		t = TagDefinition(self.root)
+		f.write("/* Tags for %s */\n"%self.root.label)
+		f.write("static const struct autober_tag root_tags[] = {\n")
+		t.write(f)
+		f.write("};\n\n")
+		f.write("\n")
+		return
+
+	def __write_tag_macros(self, f, node):
+		for (n, x) in node.structs + node.sequences:
+			self.__write_tag_macros(f, x)
+		f.write("/* Tags for %s */\n"%node.label)
+		for (n, x) in node.subtags:
+			f.write("#define %-30s 0x%.4x\n"%(x.tag_macro(), x.tag))
+		f.write("\n")
+
+	def write_tag_macros(self, f):
+		self.__write_tag_macros(f, self.root)
+		f.write("/* Root tag: %s */\n"%self.root.label)
+		f.write("#define %s 0x%.4x\n"%(self.root.tag_macro(),
+						self.root.tag))
+		f.write("\n")
 
 	def write_free(self, f):
 		self.root.write_free(f)
