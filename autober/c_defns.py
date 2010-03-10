@@ -35,6 +35,10 @@ class CScalar(CDefn):
 			tabs += "\t"
 		f.write(tabs + "free(%s%s.ptr);\n"%(parent, name))
 
+	def call_decode(self, f, name, indent = 1):
+		tabs = "".join("\t" for i in range(indent))
+		f.write(tabs + "&%s;\n"%(name))
+
 class CContainer(CDefn):
 	def __scalar(self, node, prefix = '', toplevel = True):
 		ret = []
@@ -101,8 +105,6 @@ class CContainer(CDefn):
 		else:
 			self.is_root = False
 		self.prefix = prefix
-		if not self.is_root:
-			self.count_var = "%s_%s_count"%(self.prefix, node.name)
 		self.toplevel = []
 		self.toplevel = self.__toplevel(node)
 		self.scalar = self.__scalar(self)
@@ -145,10 +147,13 @@ class CContainer(CDefn):
 			if x.__class__ == CUnion:
 				continue
 			f.write("\t\tcase %s:\n"%x.tagname)
+			x.call_decode(f, str(self) + n, indent = 3)
 			f.write("\t\t\tbreak;\n");
 		for (n, x) in self.unions:
 			for (nn, xx) in x:
 				f.write("\t\tcase %s:\n"%xx.tagname)
+				xx.call_decode(f, str(self) + n + nn,
+						indent = 3)
 				f.write("\t\t\tbreak;\n");
 		f.write("\t\tdefault:\n")
 		f.write("\t\t\tfprintf(stderr, \"Unexpected tag\\n\");\n")
@@ -185,10 +190,19 @@ class CUnion(CContainer, CDefn):
 		raise Exception("WTF")
 
 class CStruct(CContainer,CDefn):
-	pass
+	def __init__(self, node, parent):
+		CContainer.__init__(self, node, parent, prefix = '->')
+	def call_decode(self, f, name, indent = 1):
+		tabs = "".join("\t" for i in range(indent))
+		f.write(tabs + "_decode_%s(&%s, ptr, tag.ber_len);\n"%(
+			self.name, name))
+
 class CStructPtr(CContainer,CDefn):
 	def __init__(self, node, parent):
 		CContainer.__init__(self, node, parent, prefix = '->')
+		if not self.is_root:
+			self.count_var = "%s_%s_count"%(self.prefix, node.name)
+			self.pname = str(parent)
 
 	def call_free(self, f, name, indent = 1):
 		tabs = ''.join("\t" for i in range(indent))
@@ -223,6 +237,12 @@ class CStructPtr(CContainer,CDefn):
 		if self.is_root:
 			f.write("\tfree(%s);\n"%str(self))
 		f.write("}\n\n")
+
+	def call_decode(self, f, name, indent = 1):
+		tabs = "".join("\t" for i in range(indent))
+		f.write(tabs + "_decode_%s(&%s[%s%s], ptr, tag.ber_len);\n"%(
+			self.name, name, self.pname, self.count_var))
+
 
 class CDefinitions:
 	def __do_print(self, node, depth = 0):
