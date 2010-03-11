@@ -148,6 +148,11 @@ class CContainer(CDefn):
 			self.is_root = True
 		else:
 			self.is_root = False
+
+		self.free_func = "_free_%s"%self.name
+		self.decode_func = "_%s"%self.name
+		self.tagblock_arr = "%s_tags"%self.name
+
 		self.prefix = prefix
 		self.toplevel = []
 		self.toplevel = self.__toplevel(node)
@@ -162,14 +167,14 @@ class CContainer(CDefn):
 	def call_free(self, f, name, indent = 1):
 		tabs = ''.join("\t" for i in range(indent))
 		if self.is_root:
-			f.write("%s_free_%s(%s);\n"%(tabs, self.name, name))
+			f.write("%s%s(%s);\n"%(tabs, self.free_func, name))
 		else:
-			f.write("%s_free_%s(&%s[i]);\n"%(tabs, self.name, name))
+			f.write("%s%s(&%s[i]);\n"%(tabs, self.free_func, name))
 
 	def write_free(self, f):
 		for (n, x) in self.structs + self.sequences:
 			x.write_free(f)
-		f.write("static void _free_%s(struct %s *%s)\n"%(str(self),
+		f.write("static void %s(struct %s *%s)\n"%(self.free_func,
 								str(self),
 								str(self)))
 		f.write("{\n")
@@ -202,7 +207,7 @@ class CContainer(CDefn):
 			x.write_decode(f)
 		for (n, x) in self.structs:
 			x.write_decode(f)
-		f.write("static int _decode_%s(struct %s *%s, \n"%(str(self),
+		f.write("static int %s(struct %s *%s, \n"%(self.decode_func,
 								str(self),
 								str(self)))
 		f.write("\t\t\t\tconst uint8_t *ptr, size_t len)\n")
@@ -252,7 +257,10 @@ class CContainer(CDefn):
 		return
 	
 	def write_tagblock(self, f):
+		f.write("static const struct autober_tag %s[] = {\n"%\
+			self.tagblock_arr);
 		map(lambda x:x.write(f), self.tagblocks)
+		f.write("};\n\n")
 
 class CUnion(CContainer, CDefn):
 	def __init__(self, node, parent, prefix = '.'):
@@ -288,9 +296,12 @@ class CStruct(CContainer,CDefn):
 		self.label = node.label
 	def call_decode(self, f, name, indent = 1):
 		tabs = "".join("\t" for i in range(indent))
-		f.write(tabs + "if ( !_decode_%s(&%s, ptr, tag.ber_len) )\n"%(
-			self.name, name))
+		f.write(tabs + "if ( !%s(&%s, ptr, tag.ber_len) )\n"%(
+			self.decode_func, name))
 		f.write(tabs + "\treturn 0;\n")
+	def call_free(self, f, name, indent = 1):
+		tabs = ''.join("\t" for i in range(indent))
+		f.write("%s%s(&%s%s);\n"%(tabs, self.free_func, str(self.parent), name))
 
 class CStructPtr(CContainer,CDefn):
 	def __init__(self, node, parent):
@@ -303,9 +314,9 @@ class CStructPtr(CContainer,CDefn):
 
 	def call_decode(self, f, name, indent = 1):
 		tabs = "".join("\t" for i in range(indent))
-		f.write(tabs + "if ( !_decode_%s(&%s[%s%s], " \
+		f.write(tabs + "if ( !%s(&%s[%s%s], " \
 				"ptr, tag.ber_len) )\n"%(
-				self.name, name, str(self.parent),
+				self.decode_func, name, str(self.parent),
 				self.count_var))
 		f.write(tabs + "\treturn 0;\n")
 		f.write(tabs + "%s%s++;\n"%(str(self.parent), self.count_var))
@@ -384,10 +395,7 @@ class CDefinitions:
 		for (n, x) in node.structs + node.sequences:
 			self.__write_tagblock(f, x)
 		f.write("/* Tags for %s */\n"%node.label)
-		f.write("static const struct autober_tag %s_tags[] = {\n"%\
-			str(node));
 		node.write_tagblock(f)
-		f.write("};\n\n")
 
 	def write_tagblocks(self, f):
 		self.__write_tagblock(f, self.root)
