@@ -98,10 +98,11 @@ int autober_constraints(const struct autober_tag *tags,
 	}
 
 	for(i = 0; i < num_tags; i++) {
-		if ( (tags[i].ab_flags & (AUTOBER_OPTIONAL|AUTOBER_UNION))
-			== AUTOBER_OPTIONAL && cons[i].count == 0 ) {
+		if ( (tags[i].ab_flags & !(AUTOBER_OPTIONAL|AUTOBER_UNION))
+			 && cons[i].count == 0 ) {
 			fprintf(stderr, "Mandatory tag: %s: missing\n",
 				tags[i].ab_label);
+			return 0;
 		}
 	}
 
