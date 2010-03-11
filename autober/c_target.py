@@ -91,7 +91,7 @@ class c_target:
 		self.__incl = ["gber.h", "autober.h"]
 
 		self.__build_structs(self.root)
-		self.__defns = CDefinitions(self.root)
+		self.__defns = CDefinitions(self.parse)
 
 	def __write_struct(self, s, f):
 		s.write(f)

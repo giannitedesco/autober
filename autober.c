@@ -75,20 +75,21 @@ int autober_constraints(const struct autober_tag *tags,
 					atag->ab_label);
 				return 0;
 			}
-			/* FIXME: check length constraints,
-			 * they vary by type...
-			 */
 			cons[idx].count++;
 			//printf("field[%u] fixed: %s: len = %u\n",
-			//	idx, atag->ab_label, cons[idx].len);
+			//	idx, atag->ab_label, tag.ber_len);
 		}
 		cons[idx].len = tag.ber_len;
 
 		if ( atag->ab_flags & AUTOBER_CHECK_SIZE ) {
-			if ( cons[idx].len < atag[idx].ab_size[0] ||
-				cons[idx].len > atag[idx].ab_size[1] ) {
+			if ( cons[idx].len < atag->ab_size[0] ||
+				cons[idx].len > atag->ab_size[1] ) {
 				fprintf(stderr, "%s violates size constraint\n",
 					atag->ab_label);
+				fprintf(stderr, "%u < %u < %u\n",
+					atag->ab_size[0],
+					cons->len,
+					atag->ab_size[1]);
 				return 0;
 			}
 		}

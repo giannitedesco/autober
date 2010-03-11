@@ -2,9 +2,12 @@ from syntax import *
 
 class CDefn:
 	def __init__(self, node, parent):
-		self.name = node.name
-		self.parent = parent
 		if parent:
+			self.name = node.name
+		else:
+			self.name = node[0].name
+		self.parent = parent
+		if parent and parent.parent:
 			self.tagname = "TAG_%s_%s"%(parent.name.upper(),
 							self.name.upper())
 		else:
@@ -14,11 +17,7 @@ class CDefn:
 	def __getitem__(self, idx):
 		raise IndexError
 	def tag_macro(self):
-		if not self.parent:
-			prefix = ''
-		else:
-			prefix = '_' + self.parent.name.upper()
-		return "TAG%s_%s"%(prefix, self.name.upper())
+		return self.tagname
 
 
 class CScalar(CDefn):
@@ -144,16 +143,23 @@ class CContainer(CDefn):
 
 	def __init__(self, node, parent, prefix = '.'):
 		CDefn.__init__(self, node, parent)
-		if parent == None:
-			self.is_root = True
+
+		if self.parent == None:
+			self.modname = node[0].name
+			self.free_func = "%s_free"%self.modname
+			self.decode_func = "_root"
+			self.tagblock_arr = "root_tags"
+			self.label = "root level"
+			self.prefix = ''
+
+			# not sure about these
+			self.alloc = False
 		else:
-			self.is_root = False
+			self.free_func = "_free_%s"%self.name
+			self.decode_func = "_%s"%self.name
+			self.tagblock_arr = "%s_tags"%self.name
+			self.prefix = prefix
 
-		self.free_func = "_free_%s"%self.name
-		self.decode_func = "_%s"%self.name
-		self.tagblock_arr = "%s_tags"%self.name
-
-		self.prefix = prefix
 		self.toplevel = []
 		self.toplevel = self.__toplevel(node)
 		self.unions = self.__unions()
@@ -166,15 +172,17 @@ class CContainer(CDefn):
 
 	def call_free(self, f, name, indent = 1):
 		tabs = ''.join("\t" for i in range(indent))
-		if self.is_root:
-			f.write("%s%s(%s);\n"%(tabs, self.free_func, name))
-		else:
-			f.write("%s%s(&%s[i]);\n"%(tabs, self.free_func, name))
+		if not self.parent:
+			self.subtags[0].call_free()
+			return
+		f.write("%s%s(&%s[i]);\n"%(tabs, self.free_func, name))
 
 	def write_free(self, f):
 		for (n, x) in self.structs + self.sequences:
 			x.write_free(f)
-		f.write("static void %s(struct %s *%s)\n"%(self.free_func,
+		if self.parent:
+			f.write("static ")
+		f.write("void %s(struct %s *%s)\n"%(self.free_func,
 								str(self),
 								str(self)))
 		f.write("{\n")
@@ -189,7 +197,6 @@ class CContainer(CDefn):
 			f.write("\tfor(i = 0; i < %s%s; i++)\n"%(
 						str(self), x.count_var))
 			x.call_free(f, "%s%s"%(str(self), n), indent = 2)
-			f.write("\tfree(%s%s);\n\n"%(str(self), n))
 
 		for (n, x) in self.unions:
 			x.write_free(f, str(self), n)
@@ -198,7 +205,7 @@ class CContainer(CDefn):
 		for (n, x) in self.structs:
 			x.call_free(f, n)
 
-		if self.is_root:
+		if self.alloc:
 			f.write("\tfree(%s);\n"%str(self))
 		f.write("}\n\n")
 
@@ -213,15 +220,15 @@ class CContainer(CDefn):
 		f.write("\t\t\t\tconst uint8_t *ptr, size_t len)\n")
 		f.write("{\n")
 		f.write("\tstatic const unsigned int num = AUTOBER_NUM_TAGS"\
-			"(%s_tags);\n"%self)
+			"(%s);\n"%self.tagblock_arr)
 		f.write("\tstruct autober_constraint cons[num];\n")
 		f.write("\tstruct gber_tag tag;\n")
 		f.write("\tconst uint8_t *end;\n\n")
 
-		f.write("\tif ( !autober_constraints(%s_tags, "\
-			"cons, num, ptr, len) ) {\n"%self)
-		f.write("\t\tfprintf(stderr, \"%s_tags: constraints "\
-			"not satisified\\n\");\n"%self)
+		f.write("\tif ( !autober_constraints(%s, "\
+			"cons, num, ptr, len) ) {\n"%self.tagblock_arr)
+		f.write("\t\tfprintf(stderr, \"%s: constraints "\
+			"not satisified\\n\");\n"%self.tagblock_arr)
 		f.write("\t\treturn 0;\n")
 		f.write("\t}\n\n")
 
@@ -241,10 +248,11 @@ class CContainer(CDefn):
 		f.write("\t\t\treturn 0;\n\n")
 		f.write("\t\tswitch(tag.ber_tag) {\n")
 		for (n, x) in self.subtags:
-			if x.__class__ == CUnion:
-				continue
 			f.write("\t\tcase %s:\n"%x.tagname)
-			x.call_decode(f, str(self) + n, indent = 3)
+			if self.parent:
+				x.call_decode(f, str(self) + n, indent = 3)
+			else:
+				x.call_decode(f, n, indent = 3)
 			f.write("\t\t\tbreak;\n");
 		f.write("\t\tdefault:\n")
 		f.write("\t\t\tfprintf(stderr, \"Unexpected tag\\n\");\n")
@@ -252,7 +260,7 @@ class CContainer(CDefn):
 		f.write("\t\t}\n")
 		f.write("\t}\n\n")
 
-		f.write("\treturn 0;\n")
+		f.write("\treturn 1;\n")
 		f.write("}\n\n")
 		return
 	
@@ -291,17 +299,27 @@ class CUnion(CContainer, CDefn):
 class CStruct(CContainer,CDefn):
 	def __init__(self, node, parent):
 		CContainer.__init__(self, node, parent, prefix = '->')
+		if parent and not parent.parent:
+			self.alloc = True
+		else:
+			self.alloc = False
 		self.tag = node.tag
-		self.alloc = False
 		self.label = node.label
 	def call_decode(self, f, name, indent = 1):
 		tabs = "".join("\t" for i in range(indent))
-		f.write(tabs + "if ( !%s(&%s, ptr, tag.ber_len) )\n"%(
-			self.decode_func, name))
+		if self.alloc:
+			f.write(tabs + "if ( !%s(%s, ptr, tag.ber_len) )\n"%(
+				self.decode_func, name))
+		else:
+			f.write(tabs + "if ( !%s(&%s, ptr, tag.ber_len) )\n"%(
+				self.decode_func, name))
 		f.write(tabs + "\treturn 0;\n")
 	def call_free(self, f, name, indent = 1):
 		tabs = ''.join("\t" for i in range(indent))
-		f.write("%s%s(&%s%s);\n"%(tabs, self.free_func, str(self.parent), name))
+		if self.parent and self.parent.parent:
+			f.write("%s%s(&%s%s);\n"%(tabs, self.free_func, str(self.parent), name))
+		else:
+			f.write("%s%s(%s);\n"%(tabs, self.free_func, name))
 
 class CStructPtr(CContainer,CDefn):
 	def __init__(self, node, parent):
@@ -309,8 +327,7 @@ class CStructPtr(CContainer,CDefn):
 		self.tag = node.tag
 		self.alloc = True
 		self.label = node.label
-		if not self.is_root:
-			self.count_var = "%s_%s_count"%(self.prefix, node.name)
+		self.count_var = "%s_%s_count"%(self.prefix, node.name)
 
 	def call_decode(self, f, name, indent = 1):
 		tabs = "".join("\t" for i in range(indent))
@@ -335,7 +352,7 @@ class TagDefinition:
 		self.union = union
 		self.check_size = False
 		self.sequence = False
-		if item.__class__ in [CStruct, CStructPtr]:
+		if item.__class__ in [CStruct, CStructPtr, CContainer]:
 			self.template = True
 			self.optional = False
 			if item.__class__ == CStructPtr:
@@ -399,13 +416,6 @@ class CDefinitions:
 
 	def write_tagblocks(self, f):
 		self.__write_tagblock(f, self.root)
-
-		t = TagDefinition(self.root)
-		f.write("/* Tags for %s */\n"%self.root.label)
-		f.write("static const struct autober_tag root_tags[] = {\n")
-		t.write(f)
-		f.write("};\n\n")
-		f.write("\n")
 		return
 
 	def __write_tag_macros(self, f, node):
@@ -418,23 +428,13 @@ class CDefinitions:
 
 	def write_tag_macros(self, f):
 		self.__write_tag_macros(f, self.root)
-		f.write("/* Root tag: %s */\n"%self.root.label)
-		f.write("#define %s 0x%.4x\n"%(self.root.tag_macro(),
-						self.root.tag))
-		f.write("\n")
 
 	def write_free(self, f):
 		self.root.write_free(f)
-		f.write("void %s_free(struct %s *%s)\n"%(str(self.root),
-							str(self.root),
-							str(self.root)))
-		f.write("{\n")
-		self.root.call_free(f, "%s"%str(self.root))
-		f.write("}\n\n")
 
 	def write_decode(self, f):
 		self.root.write_decode(f)
 
 	def __init__(self, root):
-		self.root = CStructPtr(root, None)
+		self.root = CContainer(root, None)
 		self.pretty_print()
