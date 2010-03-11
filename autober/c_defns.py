@@ -257,6 +257,8 @@ class CContainer(CDefn):
 				x.call_decode(f, str(self) + n, indent = 3)
 			else:
 				x.call_decode(f, n, indent = 3)
+			if x.parent.__class__ == CUnion:
+				x.parent.set_type_var(f, x, indent = 3)
 			f.write("\t\t\tbreak;\n");
 		f.write("\t\tdefault:\n")
 		f.write("\t\t\tfprintf(stderr, \"Unexpected tag\\n\");\n")
@@ -279,11 +281,19 @@ class CUnion(CContainer, CDefn):
 		CContainer.__init__(self, node, parent)
 		self.type_var = "%s_%s_type"%(parent.prefix, node.name)
 		self.choices = {}
+		self.typemap = {}
 		for (n, x) in self:
 			macro = "%s_%s_TYPE_%s"%(self.parent.name.upper(),
 					self.name.upper(),
 					x.name.upper())
 			self.choices[macro] = (n, x)
+			self.typemap[x] = macro
+	def set_type_var(self, f, node, indent = 3):
+		tabs = ''.join("\t" for i in range(indent))
+		f.write(tabs + "%s%s = %s;\n"%(self.parent,
+						self.type_var,
+						self.typemap[node]))
+
 	def write_free(self, f, parent, name, indent = 1):
 		tabs = ''.join("\t" for i in range(indent))
 		f.write("%sswitch(%s%s) {\n"%(tabs, parent, self.type_var))
