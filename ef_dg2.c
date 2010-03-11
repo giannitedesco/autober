@@ -72,6 +72,116 @@ static void hex_dump(const uint8_t *tmp, size_t len, size_t llen)
 	printf("\n");
 }
 
+static inline uint16_t sys_bswap16(uint16_t x)
+{
+	return (uint16_t)(
+		(((uint16_t)(x) & (uint16_t)0x00ffU) << 8) |
+	 	(((uint16_t)(x) & (uint16_t)0xff00U) >> 8));
+}
+
+static inline uint32_t sys_bswap32(uint32_t x)
+{
+	return (uint32_t)(
+		(((uint32_t)(x) & (uint32_t)0x000000ffUL) << 24) |
+		(((uint32_t)(x) & (uint32_t)0x0000ff00UL) <<  8) |
+		(((uint32_t)(x) & (uint32_t)0x00ff0000UL) >>  8) |
+		(((uint32_t)(x) & (uint32_t)0xff000000UL) >> 24));
+}
+
+#if _BYTE_ORDER == _BIG_ENDIAN
+#define sys_le32(x) sys_bswap32(x)
+#define sys_le16(x) sys_bswap16(x)
+#define sys_be32(x) (x)
+#define sys_be16(x) (x)
+#elif _BYTE_ORDER == _LITTLE_ENDIAN
+#define sys_le32(x) (x)
+#define sys_le16(x) (x)
+#define sys_be32(x) sys_bswap32(x)
+#define sys_be16(x) sys_bswap16(x)
+#else
+#error "What in hells name?!"
+#endif
+
+#define _packed __attribute__((packed))
+struct fac_hdr {
+	uint8_t magic[4];
+	uint8_t vers[4];
+	uint32_t reclen;
+	uint16_t num_img;
+	uint32_t block_len;
+	uint16_t num_features;
+	uint8_t gender;
+	uint8_t eye_color;
+	uint8_t hair_color;
+	uint8_t feature_mask[3];
+	uint16_t expression;
+	uint8_t pose_angle[3];
+	uint8_t pose_angle_uncertainty[3];
+}_packed;
+
+struct img_hdr {
+	uint8_t type;
+	uint8_t dtype;
+	uint16_t width;
+	uint16_t height;
+	uint8_t color_space;
+	uint8_t source_type;
+	uint8_t device_type[3];
+	uint8_t quality;
+}_packed;
+
+static int parse_fac(unsigned int i, const uint8_t *ptr, size_t len)
+{
+	const uint8_t *end = ptr + len;
+	struct fac_hdr *fac;
+	struct img_hdr *img;
+	char fn[32];
+	int fd;
+
+	fac = (struct fac_hdr *)ptr;
+	ptr += sizeof(*fac);
+	if ( ptr > end ) {
+		fprintf(stderr, "bio_inf[%u].bdb: Truncated\n", i);
+		return 0;
+	}
+
+	if ( memcmp(fac->magic, "FAC", sizeof(fac->magic)) ) {
+		fprintf(stderr, "bio_inf[%u].bdb: Bad magic\n", i);
+		return 0;
+	}
+
+	printf("bio_inf[%u].bdb: FAC version: %.*s\n", i,
+		sizeof(fac->vers), fac->vers);
+
+	printf("bio_inf[%u].bdb: %u features\n", i,
+		sys_le16(fac->num_features));
+	
+	ptr += sys_le16(fac->num_features) * 8;
+	if ( ptr > end ) {
+		fprintf(stderr, "bio_inf[%u].bdb: Truncated\n", i);
+		return 0;
+	}
+
+	img = (struct img_hdr *)ptr;
+	ptr += sizeof(*img);
+	if ( ptr > end ) {
+		fprintf(stderr, "bio_inf[%u].bdb: Truncated\n", i);
+		return 0;
+	}
+
+	snprintf(fn, sizeof(fn), "ef.dg2.image.%d.jpeg", i);
+	fd = open(fn, O_WRONLY|O_CREAT|O_TRUNC, 0600);
+	if ( fd < 0 )
+		return 0;
+	if ( write(fd, ptr, end - ptr) != (end - ptr) ) {
+		close(fd);
+		return 0;
+	}
+	close(fd);
+	printf("bio_inf[%u].bdb: written to %s\n", i, fn);
+	return 1;
+}
+
 static void print_bio_group(struct bio_group *bg)
 {
 	unsigned int i;
@@ -110,10 +220,18 @@ static void print_bio_group(struct bio_group *bg)
 		printf("bio_inf[%u].hdr.format_type = 0x%.4x\n", i,
 			(bh->format_type[0] << 8) |
 			bh->format_type[1]);
-		printf("bio_inf[%u].hdr.bdb = %sCONSTRUCTED\n", i, 
-			(bi->_bdb_type == BIO_INF_BDB_TYPE_BDB_NC) ?
-				"NON-" : "");
-		hex_dump(bi->bdb.bdb_nc.ptr, bi->bdb.bdb_nc.len, 16);
+		switch(bi->_bdb_type) {
+		case BIO_INF_BDB_TYPE_BDB_NC:
+			printf("bio_inf[%u].bdb = NONCONSTRUCTED\n", i);
+			parse_fac(i, bi->bdb.bdb_c.ptr, bi->bdb.bdb_c.len);
+			break;
+		case BIO_INF_BDB_TYPE_BDB_C:
+			printf("bio_inf[%u].bdb = CONSTRUCTED\n", i);
+			ber_dump(bi->bdb.bdb_c.ptr, bi->bdb.bdb_c.len);
+			break;
+		default:
+			break;
+		}
 	}
 }
 
