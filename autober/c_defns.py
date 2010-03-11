@@ -259,6 +259,9 @@ class CContainer(CDefn):
 				x.call_decode(f, n, indent = 3)
 			if x.parent.__class__ == CUnion:
 				x.parent.set_type_var(f, x, indent = 3)
+			if x.__class__ == CScalar and x.optional:
+				f.write("\t\t\t%s->_present |= %s;\n"%(\
+					str(self), x.optmacro))
 			f.write("\t\t\tbreak;\n");
 		f.write("\t\tdefault:\n")
 		f.write("\t\t\tfprintf(stderr, \"Unexpected tag\\n\");\n")
