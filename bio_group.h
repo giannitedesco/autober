@@ -28,8 +28,8 @@
 #define BIO_HDR_VALIDITY			(1<<3)
 #define BIO_HDR_CREATOR_PID			(1<<4)
 
-#define BIO_INF_BDB_TYPE_BDB_NC			0
-#define BIO_INF_BDB_TYPE_BDB_C			1
+#define BIO_INF_BDB_TYPE_BDB_NC			1
+#define BIO_INF_BDB_TYPE_BDB_C			2
 
 struct bio_group {
 	uint8_t num_instances;

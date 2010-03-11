@@ -45,12 +45,12 @@ static const struct autober_tag bio_hdr_tags[] = {
 	{.ab_label = "type",
 		.ab_type = AUTOBER_TYPE_OCTET,
 		.ab_flags = AUTOBER_OPTIONAL|AUTOBER_CHECK_SIZE,
-		.ab_size = {2, 3},
+		.ab_size = {1, 3},
 		.ab_tag = TAG_BIO_HDR_TYPE},
 	{.ab_label = "subtype",
 		.ab_type = AUTOBER_TYPE_INT,
 		.ab_flags = AUTOBER_OPTIONAL|AUTOBER_CHECK_SIZE,
-		.ab_size = {2, 2},
+		.ab_size = {1, 1},
 		.ab_tag = TAG_BIO_HDR_SUBTYPE},
 	{.ab_label = "date",
 		.ab_type = AUTOBER_TYPE_OCTET,
@@ -196,12 +196,6 @@ static int _bio_inf(struct bio_inf *bio_inf,
 		return 0;
 	}
 
-	if ( cons[1].count == 0 && cons[2].count == 0 ) {
-		fprintf(stderr, "bio_inf: one or more union "
-			"members must be set\n");
-		return 0;
-	}
-
 	for(end = ptr + len; ptr < end; ptr += tag.ber_len) {
 		ptr = ber_decode_tag(&tag, ptr, end - ptr);
 		if ( NULL == ptr )
@@ -225,6 +219,12 @@ static int _bio_inf(struct bio_inf *bio_inf,
 			fprintf(stderr, "Unexpected tag\n");
 			return 0;
 		}
+	}
+
+	if ( !bio_inf->_bdb_type ) {
+		fprintf(stderr, "bio_inf.bdb: at least one union "
+				"member must be present\n");
+		return 0;
 	}
 
 	return 1;
