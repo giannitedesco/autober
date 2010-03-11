@@ -57,7 +57,7 @@ static const struct autober_tag bio_hdr_tags[] = {
 		.ab_flags = AUTOBER_OPTIONAL|AUTOBER_CHECK_SIZE,
 		.ab_size = {7, 7},
 		.ab_tag = TAG_BIO_HDR_DATE},
-	{.ab_label = "validty",
+	{.ab_label = "validity",
 		.ab_type = AUTOBER_TYPE_OCTET,
 		.ab_flags = AUTOBER_OPTIONAL|AUTOBER_CHECK_SIZE,
 		.ab_size = {8, 8},
@@ -203,7 +203,8 @@ static int _bio_inf(struct bio_inf *bio_inf,
 
 		switch(tag.ber_tag) {
 		case TAG_BIO_INF_BIO_HDR:
-			_bio_hdr(&bio_inf->bio_hdr, ptr, tag.ber_len);
+			if ( !_bio_hdr(&bio_inf->bio_hdr, ptr, tag.ber_len) )
+				return 0;
 			break;
 		case TAG_BIO_INF_BDB_NC:
 			if ( !autober_blob(&bio_inf->bdb.bdb_nc, &tag, ptr) )
