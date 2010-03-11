@@ -214,7 +214,7 @@ class CContainer(CDefn):
 			x.write_decode(f)
 		for (n, x) in self.structs:
 			x.write_decode(f)
-		f.write("static int %s(struct %s *%s, \n"%(self.decode_func,
+		f.write("static int %s(struct %s *%s,\n"%(self.decode_func,
 								str(self),
 								str(self)))
 		f.write("\t\t\t\tconst uint8_t *ptr, size_t len)\n")
@@ -409,10 +409,10 @@ class CDefinitions:
 		self.__do_print(self.root, 1)
 
 	def __write_tagblock(self, f, node):
-		for (n, x) in node.structs + node.sequences:
-			self.__write_tagblock(f, x)
 		f.write("/* Tags for %s */\n"%node.label)
 		node.write_tagblock(f)
+		for (n, x) in node.structs + node.sequences:
+			self.__write_tagblock(f, x)
 
 	def write_tagblocks(self, f):
 		self.__write_tagblock(f, self.root)
