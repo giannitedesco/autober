@@ -11,7 +11,7 @@ BER_DUMP_OBJ = ber_dump.o
 BER_DUMP_SLIBS = gber.a
 BER_DUMP_LIBS =
 
-EF_DG2_OBJ = ef_dg2.o auto_bio_group.o
+EF_DG2_OBJ = ef_dg2.o bio_group.o
 EF_DG2_SLIBS = gber.a
 EF_DG2_LIBS =
 
@@ -23,6 +23,8 @@ PYGBER_SLIBS = gber.a
 ALL_OBJS = $(BER_DUMP_OBJ) $(GBERA_OBJ) $(PYGBER_OBJ) $(EF_DG2_OBJ)
 ALL_TARGETS = $(BINS) $(SLIBS) $(LIBS)
 
+AUTOGEN_TARGETS = bio_group.c bio_group.h
+
 TARGET = all
 
 .PHONY: all clean dep
@@ -31,11 +33,14 @@ all: dep $(BINS) $(SLIBS) $(LIBS)
 
 dep: Make.dep
 
-Make.dep: Makefile *.c include/*.h
+Make.dep: Makefile *.c include/*.h $(AUTOGEN_TARGETS)
 	$(CC) $(CFLAGS) -MM $(patsubst %.o, %.c, $(ALL_OBJS)) > $@
 
 %.o: Makefile %.c
 	$(CC) $(CFLAGS) -c -o $@ $(patsubst %.o, %.c, $@)
+
+bio_group.c bio_group.h: examples/ef-dg2.b
+	./autober-gen $^
 
 gber.a: $(GBERA_OBJ)
 	$(AR) cr $@ $(GBERA_SLIB) $^
@@ -50,6 +55,6 @@ pygber.so: $(PYGBER_OBJ) $(PYGBER_SLIBS)
 	$(CC) $(CFLAGS) -shared -o $@ $(PYGBER_SLIBS) $^
 
 clean:
-	rm -f $(ALL_TARGETS) $(ALL_OBJS) Make.dep
+	rm -f $(ALL_TARGETS) $(ALL_OBJS) $(AUTOGEN_TARGETS) Make.dep
 
 include Make.dep

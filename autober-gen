@@ -12,8 +12,8 @@ if __name__ == '__main__':
 		ast.parse_tree.pretty_print()
 
 		target = autober.target.c(ast)
-		h_file = "auto_" + target.modname + ".h"
-		c_file = "auto_" + target.modname + ".c"
+		h_file = target.modname + ".h"
+		c_file = target.modname + ".c"
 		h = open(h_file, 'w')
 		#h = stdout
 		target.write_header(h)
