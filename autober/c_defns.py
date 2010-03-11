@@ -58,7 +58,6 @@ class CScalar(CDefn):
 			return
 		tabs = ''.join("\t" for i in range(indent))
 		if self.optional:
-			# not strictly necessary since we calloc
 			f.write(tabs + "if ( %s->_present & %s )\n"%(parent,
 					self.optmacro))
 			tabs += "\t"
@@ -173,6 +172,11 @@ class CContainer(CDefn):
 		self.subtags = self.__subtags()
 		self.tagblocks = self.__tagblocks()
 		self.tagblocks.sort()
+		ti = 0
+		for tb in self.tagblocks:
+			if tb.sequence:
+				tb.item.tagindex = ti
+			ti += 1
 
 	def call_free(self, f, name, indent = 1):
 		tabs = ''.join("\t" for i in range(indent))
@@ -236,12 +240,11 @@ class CContainer(CDefn):
 		f.write("\t\treturn 0;\n")
 		f.write("\t}\n\n")
 
-		# TODO: Check one union members set
-
 		# FIXME:use correct count
 		for (n, x) in self.sequences:
-			f.write("\t%s%s = calloc(1, sizeof(*%s%s));\n"%(
-				self, n, self, n))
+			f.write("\t%s%s = calloc(cons[%u].count, "\
+				"sizeof(*%s%s));\n"%(
+				self, n, x.tagindex, self, n))
 			f.write("\tif ( NULL == %s%s )\n"%(self, n))
 			f.write("\t\treturn 0;\n\n")
 
@@ -347,6 +350,7 @@ class CStructPtr(CContainer,CDefn):
 		self.alloc = True
 		self.label = node.label
 		self.count_var = "%s_%s_count"%(self.prefix, node.name)
+		self.tagindex = -1
 
 	def call_decode(self, f, name, indent = 1):
 		tabs = "".join("\t" for i in range(indent))
