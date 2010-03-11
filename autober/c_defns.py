@@ -8,7 +8,11 @@ class CDefn:
 			self.name = node[0].name
 		self.parent = parent
 		if parent and parent.parent:
-			self.tagname = "TAG_%s_%s"%(parent.name.upper(),
+			if parent.__class__ == CUnion:
+				self.tagname = "TAG_%s_%s"%(parent.parent.name.upper(),
+							self.name.upper())
+			else:
+				self.tagname = "TAG_%s_%s"%(parent.name.upper(),
 							self.name.upper())
 		else:
 			self.tagname = "TAG_%s"%self.name.upper()
@@ -276,7 +280,9 @@ class CUnion(CContainer, CDefn):
 		self.type_var = "%s_%s_type"%(parent.prefix, node.name)
 		self.choices = {}
 		for (n, x) in self:
-			macro = "%s_TYPE_%s"%(self.name.upper(), x.name.upper())
+			macro = "%s_%s_TYPE_%s"%(self.parent.name.upper(),
+					self.name.upper(),
+					x.name.upper())
 			self.choices[macro] = (n, x)
 	def write_free(self, f, parent, name, indent = 1):
 		tabs = ''.join("\t" for i in range(indent))
@@ -368,6 +374,8 @@ class TagDefinition:
 			self.check_size = (self.constraint != None)
 		else:
 			raise Exception("Union not permitted in tag block")
+		if self.union:
+			self.label = item.parent.name + '.' + self.label
 	def __int__(self):
 		return self.item.tag
 	def __cmp__(a, b):

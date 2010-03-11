@@ -28,8 +28,8 @@ class c_target:
 		mac = "%s_%s"%(tname.upper(), name.upper())
 		self.__macro_optionals.append((mac, "(1<<%uU)"%val))
 
-	def __define_choice(self, tname, name, val):
-		mac = "%s_TYPE_%s"%(tname.upper(), name.upper())
+	def __define_choice(self, pname, tname, name, val):
+		mac = "%s_%s_TYPE_%s"%(pname.upper(), tname.upper(), name.upper())
 		self.__macro_choices.append((mac, val))
 
 	def __do_structs(self, node, name = '', union = False):
@@ -58,7 +58,9 @@ class c_target:
 				continue
 			else:
 				if union:
-					self.__define_choice(node.name, x.name,
+					self.__define_choice(node.parent.name,
+								node.name,
+								x.name,
 								x.optindex)
 				elif x.optional:
 					self.__define_opt(node.name, x.name,
