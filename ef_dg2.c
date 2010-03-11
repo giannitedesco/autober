@@ -13,7 +13,7 @@
 #include <ctype.h>
 #include <gber.h>
 #include <autober.h>
-#include "bio_group.h"
+#include "auto_bio_group.h"
 
 static const char *cmd;
 static const char *sys_err(void)

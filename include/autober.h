@@ -43,11 +43,16 @@ int autober_constraints(const struct autober_tag *tags,
 				unsigned int num_tags,
 				const uint8_t *ptr, size_t len);
 
-int autober_u8(uint8_t *out, struct gber_tag *tag, const uint8_t *ptr);
-int autober_u16(uint16_t *out, struct gber_tag *tag, const uint8_t *ptr);
-int autober_u32(uint32_t *out, struct gber_tag *tag, const uint8_t *ptr);
-int autober_u64(uint64_t *out, struct gber_tag *tag, const uint8_t *ptr);
-int autober_octet(uint8_t *out, struct gber_tag *tag, const uint8_t *ptr);
+int autober_u8(uint8_t *out, struct gber_tag *tag, const uint8_t *ptr,
+		unsigned int *cnt);
+int autober_u16(uint16_t *out, struct gber_tag *tag, const uint8_t *ptr,
+		unsigned int *cnt);
+int autober_u32(uint32_t *out, struct gber_tag *tag, const uint8_t *ptr,
+		unsigned int *cnt);
+int autober_u64(uint64_t *out, struct gber_tag *tag, const uint8_t *ptr,
+		unsigned int *cnt);
+int autober_octet(uint8_t *out, struct gber_tag *tag, const uint8_t *ptr,
+		unsigned int *cnt);
 int autober_blob(struct autober_blob *out, struct gber_tag *tag,
 			const uint8_t *ptr);
 

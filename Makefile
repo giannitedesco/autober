@@ -11,7 +11,7 @@ BER_DUMP_OBJ = ber_dump.o
 BER_DUMP_SLIBS = gber.a
 BER_DUMP_LIBS =
 
-EF_DG2_OBJ = ef_dg2.o bio_group.o
+EF_DG2_OBJ = ef_dg2.o auto_bio_group.o
 EF_DG2_SLIBS = gber.a
 EF_DG2_LIBS =
 

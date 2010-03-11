@@ -108,40 +108,85 @@ int autober_constraints(const struct autober_tag *tags,
 	return 1;
 }
 
-int autober_u8(uint8_t *out, struct gber_tag *tag, const uint8_t *ptr)
-{
-	assert(tag->ber_len == 1);
-	*out = *ptr;
-	return 1;
-}
-
-int autober_u16(uint16_t *out, struct gber_tag *tag, const uint8_t *ptr)
-{
-	assert(tag->ber_len == 2);
-	*out = (ptr[0] << 8) | ptr[1];
-	return 1;
-}
-
-int autober_u32(uint32_t *out, struct gber_tag *tag, const uint8_t *ptr)
-{
-	assert(tag->ber_len == 4);
-	*out = (ptr[0] << 24) | (ptr[1] << 16) | (ptr[2] << 8) | ptr[3];
-	return 1;
-}
-
-int autober_u64(uint64_t *out, struct gber_tag *tag, const uint8_t *ptr)
-{
-	assert(tag->ber_len == 8);
-	*out =  ((uint64_t)ptr[0] << 56ULL) | ((uint64_t)ptr[1] << 48ULL) |
-		((uint64_t)ptr[2] << 40ULL) | ((uint64_t)ptr[3] << 32ULL) |
-		((uint64_t)ptr[4] << 24ULL) | ((uint64_t)ptr[5] << 16ULL) |
-		((uint64_t)ptr[6] << 8ULL)  | (uint64_t)ptr[7];
-	return 1;
-}
-
-int autober_octet(uint8_t *out, struct gber_tag *tag, const uint8_t *ptr)
+int autober_u8(uint8_t *out, struct gber_tag *tag, const uint8_t *ptr,
+		unsigned int *cnt)
 {
 	memcpy(out, ptr, tag->ber_len);
+	if ( cnt )
+		*cnt = tag->ber_len;
+	return 1;
+}
+
+int autober_u16(uint16_t *out, struct gber_tag *tag, const uint8_t *ptr,
+		unsigned int *cnt)
+{
+	const uint8_t *end;
+	unsigned int i;
+
+	if ( tag->ber_len & 1 )
+		return 0;
+
+	for(i = 0, end = ptr + tag->ber_len;
+			ptr < end; ptr += sizeof(*out), i++) {
+		*out = (ptr[0] << 8) | ptr[1];
+	}
+
+	if ( cnt )
+		*cnt = i;
+	return 1;
+}
+
+int autober_u32(uint32_t *out, struct gber_tag *tag, const uint8_t *ptr,
+		unsigned int *cnt)
+{
+	const uint8_t *end;
+	unsigned int i;
+
+	if ( tag->ber_len & 3 )
+		return 0;
+
+	for(i = 0, end = ptr + tag->ber_len;
+			ptr < end; ptr += sizeof(*out), i++) {
+		*out = (ptr[0] << 24) | (ptr[1] << 16) | (ptr[2] << 8) | ptr[3];
+	}
+
+	if ( cnt )
+		*cnt = i;
+	return 1;
+}
+
+int autober_u64(uint64_t *out, struct gber_tag *tag, const uint8_t *ptr,
+		unsigned int *cnt)
+{
+	const uint8_t *end;
+	unsigned int i;
+
+	if ( tag->ber_len & 7 )
+		return 0;
+
+	for(i = 0, end = ptr + tag->ber_len;
+			ptr < end; ptr += sizeof(*out), i++) {
+		*out =  ((uint64_t)ptr[0] << 56ULL) |
+			((uint64_t)ptr[1] << 48ULL) |
+			((uint64_t)ptr[2] << 40ULL) |
+			((uint64_t)ptr[3] << 32ULL) |
+			((uint64_t)ptr[4] << 24ULL) |
+			((uint64_t)ptr[5] << 16ULL) |
+			((uint64_t)ptr[6] << 8ULL)  |
+			(uint64_t)ptr[7];
+	}
+
+	if ( cnt )
+		*cnt = i;
+	return 1;
+}
+
+int autober_octet(uint8_t *out, struct gber_tag *tag, const uint8_t *ptr,
+		unsigned int *cnt)
+{
+	memcpy(out, ptr, tag->ber_len);
+	if ( cnt )
+		*cnt = tag->ber_len;
 	return 1;
 }
 

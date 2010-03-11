@@ -44,11 +44,20 @@ class CScalar(CDefn):
 			self.constraint = node.constraint
 			if self.constraint[1] / node.bytes > 1:
 				self.is_array = True
+				self.var_array = self.constraint[0] != \
+						self.constraint[1]
+				if self.var_array:
+					self.cnt_name = "&" + \
+						self.parent.name + \
+						self.parent.prefix + \
+						"_" + self.name + "_count"
 			else:
 				self.is_array = False
+				self.var_array = False
 		else:
 			self.constraint = None
 			self.is_array = False
+			self.var_array = False
 		if self.optional:
 			self.optmacro = "%s_%s"%(parent.name.upper(),
 						self.name.upper())
@@ -63,18 +72,18 @@ class CScalar(CDefn):
 			tabs += "\t"
 		f.write(tabs + "free(%s%s.ptr);\n"%(parent, name))
 
-	def __octet(self, f, tabs, name):
-		f.write(tabs + "if ( !autober_octet(%s, &tag, ptr) )\n"%(name))
-	def __uint8(self, f, tabs, name):
-		f.write(tabs + "if ( !autober_u8(%s, &tag, ptr) )\n"%(name))
-	def __uint16(self, f, tabs, name):
-		f.write(tabs + "if ( !autober_u16(%s, &tag, ptr) )\n"%(name))
-	def __uint32(self, f, tabs, name):
-		f.write(tabs + "if ( !autober_u32(%s, &tag, ptr) )\n"%(name))
-	def __uint64(self, f, tabs, name):
-		f.write(tabs + "if ( !autober_u64(%s, &tag, ptr) )\n"%(name))
-	def __blob(self, f, tabs, name):
-		f.write(tabs + "if ( !autober_blob(%s, &tag, ptr) )\n"%(name))
+	def __octet(self, f, tabs, name, cnt):
+		f.write("if ( !autober_octet(%s, &tag, ptr, %s) )\n"%(name, cnt))
+	def __uint8(self, f, tabs, name, cnt):
+		f.write("if ( !autober_u8(%s, &tag, ptr, %s) )\n"%(name, cnt))
+	def __uint16(self, f, tabs, name, cnt):
+		f.write("if ( !autober_u16(%s, &tag, ptr, %s) )\n"%(name, cnt))
+	def __uint32(self, f, tabs, name, cnt):
+		f.write("if ( !autober_u32(%s, &tag, ptr, %s) )\n"%(name, cnt))
+	def __uint64(self, f, tabs, name, cnt):
+		f.write("if ( !autober_u64(%s, &tag, ptr, %s) )\n"%(name, cnt))
+	def __blob(self, f, tabs, name, cnt):
+		f.write("if ( !autober_blob(%s, &tag, ptr) )\n"%name)
 		
 	def call_decode(self, f, name, indent = 1):
 		decodemap = {self.TYPE_OCTET: self.__octet,
@@ -87,7 +96,12 @@ class CScalar(CDefn):
 		tabs = "".join("\t" for i in range(indent))
 		if not self.is_array:
 			name = "&" + name
-		decodemap[self.type](f, tabs, name)
+		if self.var_array:
+			cnt = self.cnt_name
+		else:
+			cnt = "NULL"
+		f.write(tabs)
+		decodemap[self.type](f, tabs, name, cnt)
 		f.write(tabs + "\treturn 0;\n")
 
 class CContainer(CDefn):
@@ -262,12 +276,16 @@ class CContainer(CDefn):
 				x.call_decode(f, n, indent = 3)
 			if x.parent.__class__ == CUnion:
 				x.parent.set_type_var(f, x, indent = 3)
-			if x.__class__ == CScalar and x.optional:
+			if x.__class__ != CScalar:
+				f.write("\t\t\tbreak;\n");
+				continue
+			if x.optional:
 				f.write("\t\t\t%s->_present |= %s;\n"%(\
 					str(self), x.optmacro))
 			f.write("\t\t\tbreak;\n");
 		f.write("\t\tdefault:\n")
-		f.write("\t\t\tfprintf(stderr, \"Unexpected tag\\n\");\n")
+		f.write("\t\t\tfprintf(stderr, \"Unexpected tag: "\
+			"%.4x\\n\", tag.ber_tag);\n")
 		f.write("\t\t\treturn 0;\n")
 		f.write("\t\t}\n")
 		f.write("\t}\n\n")

@@ -66,6 +66,12 @@ class c_target:
 					self.__define_opt(node.name, x.name,
 								x.optindex)
 					opts = True
+				if x.constraint and \
+					x.constraint[0] != x.constraint[1]:
+					struct.add(ScalarDeclaration(
+							"unsigned int",
+							"_%s_count"%x.name))
+
 				struct.add(scalar(x))
 		if opts:
 			struct.add(ScalarDeclaration("unsigned int",

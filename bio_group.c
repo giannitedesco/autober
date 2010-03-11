@@ -137,41 +137,40 @@ static int _bio_hdr(struct bio_hdr *bio_hdr,
 
 		switch(tag.ber_tag) {
 		case TAG_BIO_HDR_VERS:
-			if ( !autober_u16(&bio_hdr->vers, &tag, ptr) )
+			if ( !autober_u16(&bio_hdr->vers, &tag, ptr, NULL) )
 				return 0;
 			break;
 		case TAG_BIO_HDR_TYPE:
-			if ( !autober_octet(bio_hdr->type, &tag, ptr) )
+			if ( !autober_octet(bio_hdr->type, &tag, ptr, &bio_hdr->_type_len) )
 				return 0;
 			bio_hdr->_present |= BIO_HDR_TYPE;
-			bio_hdr->_type_len = tag.ber_len;
 			break;
 		case TAG_BIO_HDR_SUBTYPE:
-			if ( !autober_u8(&bio_hdr->subtype, &tag, ptr) )
+			if ( !autober_u8(&bio_hdr->subtype, &tag, ptr, NULL) )
 				return 0;
 			bio_hdr->_present |= BIO_HDR_SUBTYPE;
 			break;
 		case TAG_BIO_HDR_DATE:
-			if ( !autober_octet(bio_hdr->date, &tag, ptr) )
+			if ( !autober_octet(bio_hdr->date, &tag, ptr, NULL) )
 				return 0;
 			bio_hdr->_present |= BIO_HDR_DATE;
 			break;
 		case TAG_BIO_HDR_VALIDITY:
-			if ( !autober_octet(bio_hdr->validity, &tag, ptr) )
+			if ( !autober_octet(bio_hdr->validity, &tag, ptr, NULL) )
 				return 0;
 			bio_hdr->_present |= BIO_HDR_VALIDITY;
 			break;
 		case TAG_BIO_HDR_CREATOR_PID:
-			if ( !autober_octet(bio_hdr->creator_pid, &tag, ptr) )
+			if ( !autober_octet(bio_hdr->creator_pid, &tag, ptr, NULL) )
 				return 0;
 			bio_hdr->_present |= BIO_HDR_CREATOR_PID;
 			break;
 		case TAG_BIO_HDR_FORMAT_OWNER:
-			if ( !autober_octet(bio_hdr->format_owner, &tag, ptr) )
+			if ( !autober_octet(bio_hdr->format_owner, &tag, ptr, NULL) )
 				return 0;
 			break;
 		case TAG_BIO_HDR_FORMAT_TYPE:
-			if ( !autober_octet(bio_hdr->format_type, &tag, ptr) )
+			if ( !autober_octet(bio_hdr->format_type, &tag, ptr, NULL) )
 				return 0;
 			break;
 		default:
@@ -255,7 +254,7 @@ static int _bio_group(struct bio_group *bio_group,
 
 		switch(tag.ber_tag) {
 		case TAG_BIO_GROUP_NUM_INSTANCES:
-			if ( !autober_u8(&bio_group->num_instances, &tag, ptr) )
+			if ( !autober_u8(&bio_group->num_instances, &tag, ptr, NULL) )
 				return 0;
 			break;
 		case TAG_BIO_GROUP_BIO_INF:
@@ -296,7 +295,7 @@ static int _root(struct bio_group *bio_group,
 				return 0;
 			break;
 		default:
-			fprintf(stderr, "Unexpected tag\n");
+			fprintf(stderr, "Unexpected tag 0x%.4x\n", tag.tag);
 			return 0;
 		}
 	}
