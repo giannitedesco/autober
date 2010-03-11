@@ -475,8 +475,32 @@ class CDefinitions:
 	def write_free(self, f):
 		self.root.write_free(f)
 
+	def __write_root_decode(self, f):
+		r = self.root
+		f.write("struct %s *%s_decode(const uint8_t *ptr, "\
+			"size_t len)\n"%(r, r))
+		f.write("{\n")
+		f.write("\tstruct %s *%s;\n\n"%(r, r))
+		f.write("\t%s = calloc(1, sizeof(*%s));\n"%(r, r))
+		f.write("\tif ( NULL == %s )\n"%r)
+		f.write("\t\treturn NULL;\n\n")
+
+		f.write("\tif ( !%s(%s, ptr, len) ) {\n"%(r.decode_func, r))
+		f.write("\t\t%s(%s);\n"%(r[0][1].free_func, r))
+		f.write("\t\treturn NULL;\n")
+		f.write("\t}\n\n")
+		f.write("\treturn %s;\n"%r)
+		f.write("}\n")
+
+	def write_func_decls(self, f):
+		r = self.root
+		f.write("struct %s *%s_decode(const uint8_t *ptr, "\
+			"size_t len);\n"%(r, r))
+		f.write("void %s(struct %s *%s);\n"%(r.free_func, r, r))
+
 	def write_decode(self, f):
 		self.root.write_decode(f)
+		self.__write_root_decode(f)
 
 	def __init__(self, root):
 		self.root = CContainer(root, None)

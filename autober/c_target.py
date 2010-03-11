@@ -129,7 +129,7 @@ class c_target:
 			self.__write_struct(s, f)
 			f.write("\n")
 
-		# TODO: write function prototypes
+		self.__defns.write_func_decls(f)
 
 		f.write("#endif /* _%s_H */\n"%self.modname.upper())
 
