@@ -7,6 +7,10 @@ class CDefn:
 		else:
 			self.name = node[0].name
 		self.parent = parent
+		self.optional = node.optional
+		if self.optional:
+			self.optmacro = "%s_%s"%(parent.name.upper(),
+						self.name.upper())
 		if parent and parent.parent:
 			if parent.__class__ == CUnion:
 				self.tagname = "TAG_%s_%s"%(parent.parent.name.upper(),
@@ -39,7 +43,6 @@ class CScalar(CDefn):
 				Blob: self.TYPE_BLOB}
 		CDefn.__init__(self, node, parent)
 		self.tag = node.tag
-		self.optional = node.optional
 		if node.constraint != None:
 			self.constraint = node.constraint
 			if self.constraint[1] / node.bytes > 1:
@@ -58,19 +61,17 @@ class CScalar(CDefn):
 			self.constraint = None
 			self.is_array = False
 			self.var_array = False
-		if self.optional:
-			self.optmacro = "%s_%s"%(parent.name.upper(),
-						self.name.upper())
 		self.type = typemap[node.__class__]
-	def call_free(self, f, parent, name, indent = 1):
+	def call_free(self, f, name, indent = 1):
 		if self.type != self.TYPE_BLOB:
 			return
 		tabs = ''.join("\t" for i in range(indent))
 		if self.optional:
-			f.write(tabs + "if ( %s->_present & %s )\n"%(parent,
+			f.write(tabs + "if ( %s->_present & %s )\n"%(\
+					self.parent,
 					self.optmacro))
 			tabs += "\t"
-		f.write(tabs + "free(%s%s.ptr);\n"%(parent, name))
+		f.write(tabs + "free(%s%s.ptr);\n"%(self.parent, name))
 
 	def __octet(self, f, tabs, name, cnt):
 		f.write("if ( !autober_octet(%s, &tag, ptr, %s) )\n"%(name, cnt))
@@ -223,7 +224,7 @@ class CContainer(CDefn):
 		for (n, x) in self.unions:
 			x.write_free(f, str(self), n)
 		for (n, x) in self.scalars:
-			x.call_free(f, self, n)
+			x.call_free(f, n)
 		for (n, x) in self.structs:
 			x.call_free(f, n)
 
@@ -276,9 +277,9 @@ class CContainer(CDefn):
 				x.call_decode(f, n, indent = 3)
 			if x.parent.__class__ == CUnion:
 				x.parent.set_type_var(f, x, indent = 3)
-			if x.__class__ != CScalar:
-				f.write("\t\t\tbreak;\n");
-				continue
+			#if x.__class__ == CScalar:
+			#	f.write("\t\t\tbreak;\n");
+			#	continue
 			if x.optional:
 				f.write("\t\t\t%s->_present |= %s;\n"%(\
 					str(self), x.optmacro))
@@ -326,8 +327,7 @@ class CUnion(CContainer, CDefn):
 		for k in keys:
 			f.write("%scase %s:\n"%(tabs, k))
 			(n, x) = self.choices[k]
-			x.call_free(f, parent, name + n,
-					indent = indent + 1)
+			x.call_free(f, name + n, indent + 1)
 			f.write("%s\tbreak;\n"%tabs)
 		f.write("%s}\n"%tabs);
 		return
@@ -356,6 +356,11 @@ class CStruct(CContainer,CDefn):
 		f.write(tabs + "\treturn 0;\n")
 	def call_free(self, f, name, indent = 1):
 		tabs = ''.join("\t" for i in range(indent))
+		if self.optional:
+			f.write(tabs + "if ( %s->_present & %s )\n"%(\
+					self.parent,
+					self.optmacro))
+			tabs += "\t"
 		if self.parent and self.parent.parent:
 			f.write("%s%s(&%s%s);\n"%(tabs, self.free_func, str(self.parent), name))
 		else:
@@ -395,7 +400,7 @@ class TagDefinition:
 		self.sequence = False
 		if item.__class__ in [CStruct, CStructPtr, CContainer]:
 			self.template = True
-			self.optional = False
+			self.optional = item.optional
 			if item.__class__ == CStructPtr:
 				self.sequence = True
 			self.label = item.label

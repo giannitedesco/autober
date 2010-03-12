@@ -132,8 +132,12 @@ class parser:
 			tmpl = Union(self.__name, self.__label)
 		else:
 			tmpl = Template(self.__tagno, self.__name,
-					self.__subscript, self.__label)
+					self.__subscript, self.__label,
+					self.__optional)
 		x = self.__stack.pop()
+		if self.__optional and not self.__union:
+			tmpl.optindex = x.cur_opt
+			x.cur_opt += 1
 		tmpl.parent = x
 		x.add(tmpl)
 		self.__stack.append(x)
@@ -170,8 +174,8 @@ class parser:
 		x = self.__stack.pop()
 		fixd.parent = x
 		if self.__optional or x.__class__ == Union:
-			fixd.optindex = x.optindex
-			x.optindex += 1
+			fixd.optindex = x.cur_opt
+			x.cur_opt += 1
 		x.add(fixd)
 		self.__stack.append(x)
 		self.__state = self.STATE_TAG

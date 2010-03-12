@@ -11,6 +11,7 @@
 #include <sys/mman.h>
 #include <assert.h>
 #include <ctype.h>
+#include <endian.h>
 #include <gber.h>
 #include <autober.h>
 #include "bio_group.h"
@@ -72,36 +73,6 @@ static void hex_dump(const uint8_t *tmp, size_t len, size_t llen)
 	printf("\n");
 }
 
-static inline uint16_t sys_bswap16(uint16_t x)
-{
-	return (uint16_t)(
-		(((uint16_t)(x) & (uint16_t)0x00ffU) << 8) |
-	 	(((uint16_t)(x) & (uint16_t)0xff00U) >> 8));
-}
-
-static inline uint32_t sys_bswap32(uint32_t x)
-{
-	return (uint32_t)(
-		(((uint32_t)(x) & (uint32_t)0x000000ffUL) << 24) |
-		(((uint32_t)(x) & (uint32_t)0x0000ff00UL) <<  8) |
-		(((uint32_t)(x) & (uint32_t)0x00ff0000UL) >>  8) |
-		(((uint32_t)(x) & (uint32_t)0xff000000UL) >> 24));
-}
-
-#if _BYTE_ORDER == _BIG_ENDIAN
-#define sys_le32(x) sys_bswap32(x)
-#define sys_le16(x) sys_bswap16(x)
-#define sys_be32(x) (x)
-#define sys_be16(x) (x)
-#elif _BYTE_ORDER == _LITTLE_ENDIAN
-#define sys_le32(x) (x)
-#define sys_le16(x) (x)
-#define sys_be32(x) sys_bswap32(x)
-#define sys_be16(x) sys_bswap16(x)
-#else
-#error "What in hells name?!"
-#endif
-
 #define _packed __attribute__((packed))
 struct fac_hdr {
 	uint8_t magic[4];
@@ -154,9 +125,9 @@ static int parse_fac(unsigned int i, const uint8_t *ptr, size_t len)
 		sizeof(fac->vers), fac->vers);
 
 	printf("bio_inf[%u].bdb: %u features\n", i,
-		sys_le16(fac->num_features));
+		htobe16(fac->num_features));
 	
-	ptr += sys_le16(fac->num_features) * 8;
+	ptr += htobe16(fac->num_features) * 8;
 	if ( ptr > end ) {
 		fprintf(stderr, "bio_inf[%u].bdb: Truncated\n", i);
 		return 0;

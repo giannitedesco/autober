@@ -48,8 +48,13 @@ class c_target:
 						"_%s_count"%x.name))
 					self.structs.append(ret)
 				else:
+					if x.optional:
+						self.__define_opt(node.name,
+								x.name,
+								x.optindex)
 					ret = self.__do_structs(x, x.name)
 					struct.add(ret)
+					opts = True
 			elif x.__class__ == Union:
 				ret = self.__do_structs(x, x.name, True)
 				struct.add(ScalarDeclaration("unsigned int",

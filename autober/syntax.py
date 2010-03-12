@@ -5,6 +5,7 @@ class Root:
 		self.children = []
 		self.parent = None
 		self.name = ''
+		self.optional = False
 	def add(self, child):
 		self.children.append(child)
 	def __iter__(self):
@@ -22,12 +23,14 @@ class Root:
 
 
 class Template(Root):
-	def __init__(self, tag, name, subscript, label):
+	def __init__(self, tag, name, subscript, label, optional = False):
 		Root.__init__(self)
 		self.tag = tag
 		self.name = name
 		self.label = label
-		self.optindex = 0
+		self.cur_opt = 0
+		self.optional = optional
+		self.optindex = -1
 		if subscript == None:
 			self.sequence = False
 		else:
@@ -47,7 +50,7 @@ class Union(Root):
 		Root.__init__(self)
 		self.name = name
 		self.label = label
-		self.optindex = 0
+		self.cur_opt = 0
 	def __str__(self):
 		return "Union(%s)"%self.label
 	def __repr__(self):
