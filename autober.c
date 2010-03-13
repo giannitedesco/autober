@@ -53,8 +53,6 @@ int autober_constraints(const struct autober_tag *tags,
 		ptr = ber_decode_tag(&tag, ptr, end - ptr);
 		atag = do_find_tag(tags, num_tags, tag.ber_tag);
 		if ( NULL == atag ) {
-			fprintf(stderr, "autober: tag 0x%x not found\n",
-				tag.ber_tag);
 			ptr += tag.ber_len;
 			continue;
 		}

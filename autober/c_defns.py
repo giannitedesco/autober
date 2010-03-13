@@ -71,7 +71,7 @@ class CScalar(CDefn):
 					self.parent,
 					self.optmacro))
 			tabs += "\t"
-		f.write(tabs + "free(%s%s.ptr);\n"%(self.parent, name))
+		f.write(tabs + "free(%s.ptr);\n"%(name))
 
 	def __octet(self, f, tabs, name, cnt):
 		f.write("if ( !autober_octet(%s, &tag, ptr, %s) )\n"%(name, cnt))
@@ -222,7 +222,7 @@ class CContainer(CDefn):
 			x.call_free(f, "%s%s"%(str(self), n), indent = 2)
 
 		for (n, x) in self.unions:
-			x.write_free(f, str(self), n)
+			x.write_free(f, self, str(self) + n)
 		for (n, x) in self.scalars:
 			x.call_free(f, n)
 		for (n, x) in self.structs:
@@ -285,9 +285,10 @@ class CContainer(CDefn):
 					str(self), x.optmacro))
 			f.write("\t\t\tbreak;\n");
 		f.write("\t\tdefault:\n")
-		f.write("\t\t\tfprintf(stderr, \"Unexpected tag: "\
-			"%.4x\\n\", tag.ber_tag);\n")
-		f.write("\t\t\treturn 0;\n")
+		f.write("\t\t\tfprintf(stderr, \"" + \
+			"Unexpected tag: " + self.label + \
+			": 0x%x\\n\", tag.ber_tag);\n")
+		f.write("\t\t\tcontinue;\n")
 		f.write("\t\t}\n")
 		f.write("\t}\n\n")
 
