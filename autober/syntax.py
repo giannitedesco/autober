@@ -91,6 +91,11 @@ class Uint(Fixed):
 			raise BadSyntax(subs[0], "Invalid subscript: %s"%\
 				''.join(map(str, subs)), extra = False)
 
+		if min > max:
+			raise BadSyntax(subs[0], "Invalid subscript: "
+				"min > max: %s"%\
+				''.join(map(str, subs)), extra = False)
+
 		return (min * self.bytes, max * self.bytes)
 
 	def __init__(self, tag, bits, name, subs, optional = False):

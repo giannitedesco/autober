@@ -1,13 +1,60 @@
 from syntax import *
 
+CPP_TAG_SUFFIX		= "_TAG"
+CPP_PRESENCE_SUFFIX	= ''
+CPP_TYPE_INFIX		= "_TYPE_"
+
 def preproc_define(f, name, val):
 	f.write("#define %-30s %s\n"%(name, val))
+
+class CTagStruct:
+	def __init__(self, label, cpptag, union = False):
+		self.label = label
+		self.cpptag = cpptag
+		self.union = union
+		self.optional = False
+		self.check_size = False
+
+		self.template = None
+
+	def flags(self):
+		list = []
+		if self.template:
+			list.append("AUTOBER_TEMPLATE")
+			if self.sequence:
+				list.append("AUTOBER_SEQUENCE")
+		if self.union:
+			list.append("AUTOBER_UNION")
+		if self.optional:
+			list.append("AUTOBER_OPTIONAL")
+		if self.check_size:
+			list.append("AUTOBER_CHECK_SIZE")
+		return "|".join(list)
+
+	def set_template(self, sequence = False):
+		self.template = True
+		self.sequence = False
+
+	def set_sizes(self, min, max):
+		self.check_size = True
+		assert(min <= max)
+		self.constraint = (min, max)
+
+	def write(self, f):
+		f.write("\t{.ab_label = \"%s\",\n"%self.label)
+		if self.flags() != '':
+			f.write("\t\t.ab_flags = %s,\n"%self.flags())
+		if self.check_size:
+			f.write("\t\t.ab_size = {%u, %u},\n"%self.constraint)
+		f.write("\t\t.ab_tag = %s},\n"%self.cpptag)
 
 class CScalar:
 	def __init__(self, node, union = None):
 		self.union = union
 		self.tagno = node.tag
 		self.name = node.name
+		self.label = node.name
+		self.constraint = node.constraint
 	def set_cname(self, name):
 		self.cname = name
 	def set_cppname(self, name):
@@ -19,6 +66,7 @@ class CStructBase:
 		self.label = label
 		self.tagno = tagno
 		self.prefix = "->"
+		self.tagblock_name = "%s_tags"%self.name
 	
 	def set_cname(self, name):
 		self.cname = name
@@ -84,7 +132,27 @@ class CStructBase:
 			self._unionmap[uname].append(x)
 
 	def write_tagblock(self, f):
+		for x in self._tags:
+			if x.__class__ == CScalar:
+				continue
+			x.write_tagblock(f)
+
 		f.write("/* Tags for %s */\n"%self)
+		f.write("static const struct autober_tag %s[] = {\n"%
+			self.tagblock_name)
+		for x in self._tags:
+			tagstruct = CTagStruct(x.label,
+						x.cppname + CPP_TAG_SUFFIX,
+						x.union != None)
+			if x.__class__ == CStruct:
+				tagstruct.set_template(sequence = False)
+			elif x.__class__ == CStructPtr:
+				tagstruct.set_template(sequence = True)
+			elif x.constraint != None:
+				tagstruct.set_sizes(*x.constraint)
+			tagstruct.write(f)
+		f.write("};\n\n")
+
 	def write_tag_macros(self, f):
 		for x in self._tags:
 			if x.__class__ == CScalar:
@@ -92,13 +160,24 @@ class CStructBase:
 			x.write_tag_macros(f)
 		f.write("/* Tag numbers for %s */\n"%self)
 		for x in self._tags:
-			preproc_define(f, x.cppname + "_TAG",
+			preproc_define(f, x.cppname + CPP_TAG_SUFFIX,
 					"0x%x"%x.tagno)
 		f.write("\n")
+
 	def write_free_func(self, f):
+		for x in self._tags:
+			if x.__class__ == CScalar:
+				continue
+			x.write_free_func(f)
 		f.write("/* Free func for %s */\n"%self)
+
 	def write_decode_func(self, f):
+		for x in self._tags:
+			if x.__class__ == CScalar:
+				continue
+			x.write_decode_func(f)
 		f.write("/* Decode func for %s */\n"%self)
+
 	def __str__(self):
 		return self.name
 	def __iter__(self):
