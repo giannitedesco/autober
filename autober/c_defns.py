@@ -8,6 +8,10 @@ class CScalar:
 		self.union = union
 		self.tagno = node.tag
 		self.name = node.name
+	def set_cname(self, name):
+		self.cname = name
+	def set_cppname(self, name):
+		self.cppname = name
 
 class CStructBase:
 	def __init__(self, name, label, tagno = None):
@@ -15,6 +19,11 @@ class CStructBase:
 		self.label = label
 		self.tagno = tagno
 		self.prefix = "->"
+	
+	def set_cname(self, name):
+		self.cname = name
+	def set_cppname(self, name):
+		self.cppname = name
 
 	def __recurse(self, node, union = None):
 		if node.__class__ == Template:
@@ -30,12 +39,20 @@ class CStructBase:
 	def _name_union(self, u):
 		return "%s%s%s"%(self.name, self.prefix, u.name)
 
-	def _name_tag(self, ch):
+	def _name_member(self, ch):
 		if ch.union:
 			return "%s%s%s.%s"%(self.name, self.prefix,
 						ch.union.name, ch.name)
 		else:
 			return "%s%s%s"%(self.name, self.prefix, ch.name)
+
+	def _name_macro(self, ch):
+		if ch.union:
+			return "%s%s_%s"%(self._macro_prefix,
+						ch.union.name.upper(),
+						ch.name.upper())
+		else:
+			return "%s%s"%(self._macro_prefix, ch.name.upper())
 
 	def _members(self, iter):
 		m = []
@@ -48,28 +65,34 @@ class CStructBase:
 				memb = self.__recurse(x)
 				m.append(memb)
 
-		self._tags = map(lambda x:(self._name_tag(x), x), m)
+		map(lambda x:x.set_cname(self._name_member(x)), m)
+		map(lambda x:x.set_cppname(self._name_macro(x)), m)
+		self._tags = m
 
 		self._tagmap = {}
-		for (n, x) in self._tags:
-			self._tagmap[x.tagno] = (n, x)
+		for x in self._tags:
+			self._tagmap[x.tagno] = x
 
-		self._scab_tags = filter(lambda x:not x[1].union, self._tags)
+		self._scab_tags = filter(lambda x:not x.union, self._tags)
 
-		utags = filter(lambda x:x[1].union, self._tags)
+		utags = filter(lambda x:x.union, self._tags)
 		self._unionmap = {}
-		for (n, x) in utags:
+		for x in utags:
 			uname = self._name_union(x.union)
 			if not self._unionmap.has_key(uname):
 				self._unionmap[uname] = []
-			self._unionmap[uname].append((n, x))
+			self._unionmap[uname].append(x)
 
 	def write_tagblock(self, f):
 		f.write("/* Tags for %s */\n"%self)
 	def write_tag_macros(self, f):
+		for x in self._tags:
+			if x.__class__ == CScalar:
+				continue
+			x.write_tag_macros(f)
 		f.write("/* Tag numbers for %s */\n"%self)
-		for (n, x) in self._scab_tags:
-			preproc_define(f, self._macro_prefix + x.name.upper(),
+		for x in self._tags:
+			preproc_define(f, x.cppname + "_TAG",
 					"0x%x"%x.tagno)
 		f.write("\n")
 	def write_free_func(self, f):
@@ -86,19 +109,22 @@ class CStructBase:
 		print "%s instance: %s"%(self.__class__.__name__,
 					self.name)
 
-		for (k, (n, x)) in self._tagmap.items():
-			print "  Tag 0x%x: %s: %s"%(k, n, x.__class__.__name__)
+		for (k, x) in self._tagmap.items():
+			print "  Tag 0x%x: %s / %s: %s"%(k, x.cname,
+						x.cppname,
+						x.__class__.__name__)
 
 		for (uname, arr) in self._unionmap.items():
 			print "  Union %s contains:"%uname
-			for (n, x) in arr:
-				print "    - %s: %s"%(n, x.__class__.__name__)
+			for x in arr:
+				print "    - %s: %s"%(x.cname,
+							x.__class__.__name__)
 		print "  Non-union tags:"
-		for (n, x) in self._scab_tags:
-			print "    - %s: %s"%(n, x.__class__.__name__)
+		for x in self._scab_tags:
+			print "    - %s: %s"%(x.cname, x.__class__.__name__)
 
 		print
-		for (n, x) in self._tags:
+		for x in self._tags:
 			if x.__class__ == CScalar:
 				continue
 			x.pretty_print()
