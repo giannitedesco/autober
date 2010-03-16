@@ -447,16 +447,6 @@ class TagDefinition:
 
 
 class CDefinitions:
-	def __do_print(self, node, depth = 0):
-		indent = ''.join("\t" for x in range(depth))
-		for (n, x) in node:
-			print "%s%s"%(indent, n)
-			self.__do_print(x, depth + 1)
-			
-	def pretty_print(self):
-		print str(self.root)
-		self.__do_print(self.root, 1)
-
 	def __write_tagblock(self, f, node):
 		f.write("/* Tags for %s */\n"%node.label)
 		node.write_tagblock(f)
@@ -510,4 +500,3 @@ class CDefinitions:
 
 	def __init__(self, root):
 		self.root = CContainer(root, None)
-		self.pretty_print()

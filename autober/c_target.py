@@ -52,9 +52,9 @@ class c_target:
 						self.__define_opt(node.name,
 								x.name,
 								x.optindex)
+						opts = True
 					ret = self.__do_structs(x, x.name)
 					struct.add(ret)
-					opts = True
 			elif x.__class__ == Union:
 				ret = self.__do_structs(x, x.name, True)
 				struct.add(ScalarDeclaration("unsigned int",

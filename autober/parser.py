@@ -5,10 +5,10 @@ class parser:
 	STATE_TAG	= 0 # initial state
 	STATE_FLAGS	= 1 # template/fixed flags
 	STATE_T_NAME	= 2 # template name
-	STATE_T_SUB	= 3 # template name
+	STATE_T_SUB	= 3 # template subscript
 	STATE_T_LABEL	= 4 # template label
 	STATE_F_TYPE	= 5 # fixed type
-	STATE_F_SUB	= 6
+	STATE_F_SUB	= 6 # fixed subscript
 	STATE_F_NAME	= 7 # fixed name
 	STATE_PUSH	= 8 # recurse
 	STATE_POP	= 9 # recurse

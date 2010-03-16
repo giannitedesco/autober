@@ -38,6 +38,7 @@ class Template(Root):
 				self.sequence = True
 			else:
 				raise Exception("Template arrays not supported")
+				# fucking should be
 	def __str__(self):
 		return "Template(%s)"%self.label
 	def __repr__(self):
@@ -51,6 +52,10 @@ class Union(Root):
 		self.name = name
 		self.label = label
 		self.cur_opt = 0
+	def add(self, child):
+		if child.__class__ == Template and child.sequence:
+			raise Exception("No template sequences permitted in unions")
+		Root.add(self, child)
 	def __str__(self):
 		return "Union(%s)"%self.label
 	def __repr__(self):
