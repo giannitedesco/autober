@@ -1,6 +1,7 @@
 from errors import *
 from tokens import *
 from itertools import tee
+from string import hexdigits, letters
 
 class LexIter:
 	def __init__(self, fn):
@@ -8,15 +9,8 @@ class LexIter:
 		self.lineno = 0
 		self.__linebuf = ''
 		self.__charbuf = iter('')
-		self.__hexmap = {}.fromkeys(
-			[chr(ord('0') + i) for i in xrange(10)] +
-			[chr(ord('a') + i) for i in xrange(6)] +
-			[chr(ord('A') + i) for i in xrange(6)])
-		self.__tokmap = {}.fromkeys(
-			[chr(ord('0') + i) for i in xrange(10)] +
-			[chr(ord('a') + i) for i in xrange(26)] +
-			[chr(ord('A') + i) for i in xrange(26)] +
-			['_'])
+		self.__hexmap = {}.fromkeys(hexdigits)
+		self.__tokmap = {}.fromkeys(hexdigits + letters + '_')
 
 	def __get_line(self):
 		self.lineno += 1
@@ -46,11 +40,7 @@ class LexIter:
 	def __numtok(self, char):
 		(self.__charbuf, it) = tee(self.__charbuf)
 		while True:
-			try:
-				nchar = it.next()
-			except StopIteration:
-				raise Exception("Bad EOL")
-
+			nchar = it.next()
 			if len(char) == 1:
 				hex = nchar == 'x'
 				if hex:
@@ -89,10 +79,7 @@ class LexIter:
 	def __regtok(self, char):
 		(self.__charbuf, it) = tee(self.__charbuf)
 		while True:
-			try:
-				nchar = it.next()
-			except StopIteration:
-				raise Exception("Bad EOL")
+			nchar = it.next()
 			if not self.__istok(nchar):
 				break
 			char += nchar
