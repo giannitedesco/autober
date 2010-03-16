@@ -4,17 +4,19 @@ import autober
 from sys import stdout,argv
 
 if __name__ == '__main__':
+	ecode = 0
+
 	for x in argv[1:]:
-		lex = autober.lexer(x)
-
-		#for y in lex:
-		#	print "%r"%y
-		#raise SystemExit
-
-		parser = autober.parser(lex)
-		p = parser.parse_tree()
-		ast = autober.semantics(p)
-		ast.parse_tree.pretty_print()
+		try:
+			lex = autober.lexer(x)
+			parser = autober.parser(lex)
+			p = parser.parse_tree()
+			ast = autober.semantics(p)
+			ast.parse_tree.pretty_print()
+		except autober.AutoberException, e:
+			print str(e)
+			ecode += 1
+			continue
 
 		target = autober.target.c(ast)
 		h_file = target.modname + ".h"
@@ -26,3 +28,5 @@ if __name__ == '__main__':
 		#c = stdout
 		target.include(h_file)
 		target.write_code(c)
+	
+	raise SystemExit, ecode

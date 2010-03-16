@@ -1,3 +1,4 @@
+from errors import *
 from tokens import *
 from syntax import *
 
@@ -52,8 +53,9 @@ class parser:
 
 		if tok.__class__ == LexInteger:
 			self.__tagno = int(tok)
+			assert(self.__tagno >= 0)
 			if self.__tagno > 0xffff:
-				raise Exception("Parse error")
+				raise BadSyntax(tok, "Bad tag number")
 			self.__state = self.STATE_FLAGS
 			return True
 		elif tok.__class__ == LexKeyword:
@@ -61,7 +63,7 @@ class parser:
 				self.__union = True
 				self.__state = self.STATE_T_NAME
 				return True
-		raise Exception("Parse error")
+		raise BadSyntax(tok, "Expected union or template")
 
 	def __flags(self, tok):
 		if tok.__class__ == LexKeyword:
@@ -71,7 +73,7 @@ class parser:
 			if int(tok) == tok.NOCONSTRUCT:
 				self.__noconstruct = True
 				return True
-			raise Exception("Parse error")
+			raise BadSyntax(tok, "Unexpected keyword")
 		if self.__template():
 			self.__state = self.STATE_T_NAME
 		else:
@@ -80,7 +82,7 @@ class parser:
 
 	def __t_name(self, tok):
 		if tok.__class__ != LexIdentifier:
-			raise Exception("Parse error")
+			raise BadSyntax(tok, "Expected template identifier")
 		self.__name = str(tok)
 		self.__state = self.STATE_T_SUB
 		return True
@@ -98,19 +100,21 @@ class parser:
 			self.__state = self.STATE_T_LABEL
 		else:
 			# TODO: Template arrays
-			raise Exception("Syntax error")
+			raise BadSyntax(tok,
+					"Template arrays not yet implemented")
 		return True
 
 	def __t_label(self, tok):
 		if tok.__class__ != LexString:
-			raise Exception("Parse error")
+			raise BadSyntax(tok, "Expected template label")
 		self.__label = str(tok)
 		self.__state = self.STATE_PUSH
 		return True
 
 	def __f_type(self, tok):
 		if tok.__class__ != LexType:
-			raise Exception("Parse error")
+			raise BadSyntax(tok, "Type must be one of: " + \
+					', '.join(self.__types.keys()))
 		self.__type = tok
 		self.__state = self.STATE_F_SUB
 		return True
@@ -131,17 +135,25 @@ class parser:
 
 	def __f_name(self, tok):
 		if tok.__class__ != LexIdentifier:
-			raise Exception("Parse error")
+			raise BadSyntax(tok, "Expected fixed item identifier")
 		self.__name = str(tok)
 		self.__state = self.STATE_ADD
 		return True
 
 	def __f_push(self, tok):
 		if not self.__template():
-			raise Exception("Parse Error:")
+			raise BadSyntax(tok, "Tag 0x%x is not a template"%\
+					self.__tagno)
+					# "sugest: CONSTRUCT option"
 
 		if tok.__class__ != LexOpenBrace:
-			raise Exception("Parse Error:")
+			if self.__union:
+				raise BadSyntax(tok, "Union element, "
+						"expecting open brace")
+			else:
+				raise BadSyntax(tok,
+					"Tag 0x%x is a template: "%\
+					self.__tagno + "expecting open brace")
 
 		if self.__union:
 			tmpl = Union(self.__name, self.__label)
@@ -161,20 +173,20 @@ class parser:
 		return True
 	
 	def __f_pop(self, tok):
-		if tok.__class__ != LexCloseBrace:
-			raise Exception("Parse Error")
+		assert(tok.__class__ == LexCloseBrace)
 		self.__state = self.STATE_TAG
 		self.__stack.pop()
 		return True
 	
 	def __f_add(self, tok):
 		if tok.__class__ != LexSemiColon:
-			raise Exception("Parse Error: %s")
+			raise BadSyntax(tok, "Missing semi-colon")
 
 		try:
 			cls = self.__types[str(self.__type)]
 		except KeyError:
-			raise Exception("Unknown type: %s"%self.__type)
+			raise BadSyntax(tok, "type must be one of: "%\
+					', '.join(self.__types.keys()))
 
 		fixd = cls(self.__tagno, self.__name,
 				self.__subtokens, self.__optional)

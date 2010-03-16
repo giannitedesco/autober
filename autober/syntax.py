@@ -1,3 +1,4 @@
+from errors import *
 from tokens import *
 
 class Root:
@@ -47,7 +48,8 @@ class Union(Root):
 		self.cur_opt = 0
 	def add(self, child):
 		if child.__class__ == Template and child.sequence:
-			raise Exception("No template sequences permitted in unions")
+			raise AutoberException("Syntax Error",
+				"Template sequences permitted in unions")
 		Root.add(self, child)
 	def __str__(self):
 		return "Union(%s)"%self.label
@@ -75,17 +77,19 @@ class Uint(Fixed):
 		if subs == None:
 			min = max = 1
 		elif len(subs) == 0:
-			raise Exception("Use a blob")
-		elif len(subs) == 1:
-			assert(subs[0].__class__ == LexInteger)
+			raise AutoberException("Syntax Error",
+					"Array lengths must be specified: "
+					"suggest 'blob' type")
+		elif len(subs) == 1 and subs[0].__class__ == LexInteger:
 			min = max = int(subs[0])
-		elif len(subs) == 3:
-			assert(map(lambda x:x.__class__, subs) ==
-				[LexInteger, LexRange, LexInteger])
+		elif len(subs) == 3 and \
+				map(lambda x:x.__class__, subs) == \
+				[LexInteger, LexRange, LexInteger]:
 			min = int(subs[0])
 			max = int(subs[2])
 		else:
-			raise Exception("Syntax error")
+			raise BadSyntax(subs[0], "Invalid subscript: %s"%\
+				''.join(map(str, subs)), extra = False)
 
 		return (min * self.bytes, max * self.bytes)
 
@@ -139,6 +143,8 @@ class Uint64(Uint,Fixed):
 class Blob(Fixed):
 	def __init__(self, tag, name, subs, optional = False):
 		Fixed.__init__(self, tag, name, optional)
-		assert(subs == None)
+		if subs != None:
+			raise AutoberException("Syntax Error",
+				"Arrays of type 'blob' not permitted")
 	def __str__(self):
 		return "Blob(%s)"%self.name

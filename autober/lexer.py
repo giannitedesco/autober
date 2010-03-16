@@ -1,3 +1,4 @@
+from errors import *
 from tokens import *
 from itertools import tee
 
@@ -109,7 +110,9 @@ class LexIter:
 
 	def __comment(self):
 		star = self.__get_char()
-		assert(star == '*')
+		if star != '*':
+			raise ParseError(self.filename, self.lineno,
+				"Comments must begin /* not /%s"%star)
 
 		got_star = False
 		while True:
@@ -148,7 +151,9 @@ class LexIter:
 		if char == "'":
 			return self.__strtok(char)
 
-		assert(char.isspace())
+		if not char.isspace():
+			raise ParseError(self.filename, self.lineno,
+				"Expected whitespace not %s"%char)
 
 	def next(self):
 		tok = None

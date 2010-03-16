@@ -8,9 +8,11 @@ class LexToken:
 class LexInteger(LexToken):
 	def __init__(self, filename, lineno, str):
 		LexToken.__init__(self, filename, lineno)
+		self.strform = str
 		self.integer = int(str, 0)
 	def __str__(self):
-		return "0x%x"%self.integer
+		# for nicer error messages
+		return "%s"%self.strform
 	def __int__(self):
 		return self.integer
 
