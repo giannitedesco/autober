@@ -12,13 +12,8 @@ struct autober_blob {
 	size_t len;
 };
 
-#define AUTOBER_TYPE_BLOB	0
-#define AUTOBER_TYPE_OCTET	1
-#define AUTOBER_TYPE_INT	2 /* min = octets */
-typedef unsigned int autober_type_t;
-
 #define AUTOBER_TEMPLATE	(1<<0)
-#define AUTOBER_UNION		(1<<1) /* only valid for templates */
+#define AUTOBER_UNION		(1<<1) /* sequences excluded */
 #define AUTOBER_SEQUENCE	(1<<2) /* only valid for templates */
 #define AUTOBER_OPTIONAL	(1<<3)
 #define AUTOBER_CHECK_SIZE	(1<<4) /* in bytes */
@@ -26,7 +21,6 @@ struct autober_tag {
 	gber_tag_t	ab_tag;
 	unsigned int	ab_flags;
 	size_t		ab_size[2];
-	autober_type_t	ab_type;
 	const char	*ab_label;
 };
 
@@ -50,8 +44,6 @@ int autober_u16(uint16_t *out, struct gber_tag *tag, const uint8_t *ptr,
 int autober_u32(uint32_t *out, struct gber_tag *tag, const uint8_t *ptr,
 		unsigned int *cnt);
 int autober_u64(uint64_t *out, struct gber_tag *tag, const uint8_t *ptr,
-		unsigned int *cnt);
-int autober_octet(uint8_t *out, struct gber_tag *tag, const uint8_t *ptr,
 		unsigned int *cnt);
 int autober_blob(struct autober_blob *out, struct gber_tag *tag,
 			const uint8_t *ptr);

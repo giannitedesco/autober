@@ -181,15 +181,6 @@ int autober_u64(uint64_t *out, struct gber_tag *tag, const uint8_t *ptr,
 	return 1;
 }
 
-int autober_octet(uint8_t *out, struct gber_tag *tag, const uint8_t *ptr,
-		unsigned int *cnt)
-{
-	memcpy(out, ptr, tag->ber_len);
-	if ( cnt )
-		*cnt = tag->ber_len;
-	return 1;
-}
-
 int autober_blob(struct autober_blob *out, struct gber_tag *tag,
 			const uint8_t *ptr)
 {
