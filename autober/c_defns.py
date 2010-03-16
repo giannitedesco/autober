@@ -75,6 +75,7 @@ class CStructBase:
 		self.prefix = "->"
 		self.tagblock_name = "%s%s"%(self.name, C_TAGBLOCK_SUFFIX)
 		self.free_func = "_free_%s"%(self.name)
+		self.decode_func = "_%s"%(self.name)
 	
 	def set_cname(self, name):
 		self.cname = name
@@ -223,13 +224,24 @@ class CStructBase:
 
 	def __str__(self):
 		return self.name
+
 	def __iter__(self):
 		return self._tags.__iter__()
+
 	def __getitem__(self, idx):
 		return self._tags[idx]
+
 	def pretty_print(self):
+		for x in self._tags:
+			if x.__class__ == CScalar:
+				continue
+			x.pretty_print()
+
+		print
 		print "%s instance: %s"%(self.__class__.__name__,
 					self.name)
+		print "Free func: %s"%self.free_func
+		print "Decode func: %s"%self.decode_func
 
 		for (k, x) in self._tagmap.items():
 			print "  Tag 0x%x: %s / %s: %s"%(k, x.cname,
@@ -244,12 +256,6 @@ class CStructBase:
 		print "  Non-union tags:"
 		for x in self._scab_tags:
 			print "    - %s: %s"%(x.cname, x.__class__.__name__)
-
-		print
-		for x in self._tags:
-			if x.__class__ == CScalar:
-				continue
-			x.pretty_print()
 
 class CStruct(CStructBase):
 	def call_free(self, f, indent = 1):
@@ -285,11 +291,9 @@ class CRoot(CStructBase):
 		assert(root.__class__ == Root)
 		assert(len(root) == 1)
 		CStructBase.__init__(self, "root_", "Autober root node")
-		self.__modname = root[0].name
 		self._macro_prefix = ''
 		self.prefix = ''
 		self._members(root.__iter__())
-		self.__modname = modname
 
 	def _name_union(self, u):
 		return u.name
@@ -303,11 +307,11 @@ class CRoot(CStructBase):
 	def write_free_func(self, f):
 		root = self._tags[0]
 		root.write_free_func(f, check_null = True)
-		f.write("/* Free func for %s module */\n"%self.__modname)
-		f.write("void %s%s(struct %s *%s)\n"%(self.__modname,
+		f.write("/* Free func for %s module */\n"%root.cname)
+		f.write("void %s%s(struct %s *%s)\n"%(root.cname,
 			C_FREE_FUNC_SUFFIX, root.cname, root.cname))
 		f.write("{\n")
-		root.call_free(f)
+		f.write("\t%s(%s);\n"%(root.free_func, root.cname))
 		f.write("}\n")
 		f.write("\n")
 
@@ -317,12 +321,19 @@ class CRoot(CStructBase):
 
 		CStructBase.write_decode_func(self, f)
 
-		f.write("/* Decode func for %s module */\n"%self.__modname)
+		f.write("/* Decode func for %s module */\n"%root.cname)
 		f.write("struct %s *%s%s(const uint8_t *ptr, size_t len)\n"%(
-			self.__modname, root.cname, C_DECODE_FUNC_SUFFIX))
+			root.cname, root.cname, C_DECODE_FUNC_SUFFIX))
 		f.write("{\n")
 		f.write("}\n")
 		f.write("\n")
+
+	def write_func_decls(self, f):
+		root = self._tags[0]
+		f.write("struct %s *%s%s(const uint8_t *ptr, size_t len);\n"%(
+			root.cname, root.cname, C_DECODE_FUNC_SUFFIX))
+		f.write("void %s%s(struct %s *%s);\n"%(root.cname,
+			C_FREE_FUNC_SUFFIX, root.cname, root.cname))
 
 class CDefinitions:
 	def write_tagblocks(self, f):
@@ -335,28 +346,8 @@ class CDefinitions:
 	def write_free(self, f):
 		self.root.write_free_func(f)
 
-#	def __write_root_decode(self, f):
-#		r = self.root
-#		f.write("struct %s *%s_decode(const uint8_t *ptr, "\
-#			"size_t len)\n"%(r, r))
-#		f.write("{\n")
-#		f.write("\tstruct %s *%s;\n\n"%(r, r))
-#		f.write("\t%s = calloc(1, sizeof(*%s));\n"%(r, r))
-#		f.write("\tif ( NULL == %s )\n"%r)
-#		f.write("\t\treturn NULL;\n\n")
-#
-#		f.write("\tif ( !%s(%s, ptr, len) ) {\n"%(r.decode_func, r))
-#		f.write("\t\t%s(%s);\n"%(r[0][1].free_func, r))
-#		f.write("\t\treturn NULL;\n")
-#		f.write("\t}\n\n")
-#		f.write("\treturn %s;\n"%r)
-#		f.write("}\n")
-
 	def write_func_decls(self, f):
-		r = self.root
-		#f.write("struct %s *%s_decode(const uint8_t *ptr, "\
-		#	"size_t len);\n"%(r, r))
-		#f.write("void %s(struct %s *%s);\n"%(r.free_func, r, r))
+		self.root.write_func_decls(f)
 
 	def write_decode(self, f):
 		self.root.write_decode_func(f)
