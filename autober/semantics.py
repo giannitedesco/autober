@@ -55,8 +55,6 @@ class semantics:
 		#     it makes no fucking sense
 		self.unions = self.__check_unions()
 
-		# 3. Check variable names valid C tokens
-
-		# 4. check identifiers unique according to their namespace
+		# 3. check identifiers unique according to their namespace
 
 		return
