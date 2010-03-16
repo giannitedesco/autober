@@ -2,17 +2,11 @@ from tokens import *
 from itertools import tee
 
 class LexIter:
-	STATE_INIT	= 0
-	STATE_COMMENT	= 1
-	STATE_STRING	= 2
-	STATE_TOK = 3
-
 	def __init__(self, fn):
 		self.filename = fn
 		self.lineno = 0
 		self.__linebuf = ''
 		self.__charbuf = iter('')
-		self.__state = self.STATE_INIT
 		self.__hexmap = {}.fromkeys(
 			[chr(ord('0') + i) for i in xrange(10)] +
 			[chr(ord('a') + i) for i in xrange(6)] +
@@ -113,7 +107,21 @@ class LexIter:
 							self.lineno, char)
 		return tok
 
-	def __init(self):
+	def __comment(self):
+		star = self.__get_char()
+		assert(star == '*')
+
+		got_star = False
+		while True:
+			char = self.__get_char()
+			if got_star and char == '/':
+				return
+			if char == '*':
+				got_star = True
+			else:
+				got_star = False
+
+	def __lex_one(self):
 		charmap = {'{':LexOpenBrace,
 			'}':LexCloseBrace,
 			'[':LexOpenSub,
@@ -129,9 +137,7 @@ class LexIter:
 			return charmap[char](self.filename, self.lineno)
 
 		if char == '/':
-			char = self.__get_char()
-			assert(char == '*')
-			self.__state = self.STATE_COMMENT
+			self.__comment()
 			return
 
 		if char.isdigit():
@@ -144,33 +150,10 @@ class LexIter:
 
 		assert(char.isspace())
 
-	def __comment(self):
-		got_star = False
-		while True:
-			char = self.__get_char()
-			if got_star and char == '/':
-				self.__state = self.STATE_INIT
-				return
-			if char == '*':
-				got_star = True
-			else:
-				got_star = False
-
-	def __string(self):
-		return
-	def __tok(self):
-		return
-
 	def next(self):
-		statemap = {self.STATE_INIT: self.__init,
-			self.STATE_COMMENT: self.__comment,
-			self.STATE_STRING: self.__string,
-			self.STATE_TOK: self.__tok,
-			}
-
 		tok = None
 		while not tok:
-			tok = statemap[self.__state]()
+			tok = self.__lex_one()
 		return tok
 
 class LexIterFile(LexIter):
@@ -182,12 +165,13 @@ class LexIterFile(LexIter):
 class LexIterString(LexIter):
 	def __init__(self, str):
 		LexIter.__init__(self, object.__repr__(str))
+		# ffs, split :(
 		self._input = map(lambda x:x + '\n', str.split('\n'))
 
 class lexer:
 	def __iter__(self):
+		# TODO: preprocessing and string pasting
 		return self.__lex
 
 	def __init__(self, file):
 		self.__lex = LexIterFile(file)
-		return
