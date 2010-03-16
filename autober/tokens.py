@@ -1,28 +1,18 @@
 class LexToken:
-	def isspace(self):
-		return False
+	def __init__(self, filename, lineno):
+		self.filename = filename
+		self.lineno = lineno
+	def __repr__(self):
+		return "%s(%s)"%(self.__class__.__name__, str(self))
 
 class LexInteger(LexToken):
-	def __init__(self, str):
+	def __init__(self, filename, lineno, str):
+		LexToken.__init__(self, filename, lineno)
 		self.integer = int(str, 0)
 	def __str__(self):
 		return "0x%x"%self.integer
 	def __int__(self):
 		return self.integer
-
-class LexIntRange(LexToken):
-	def __init__(self, strmin, strmax):
-		self.min = int(strmin, 0)
-		self.max = int(strmax, 0)
-	def __str__(self):
-		return "%u-%u"%(self.min, self.max)
-	def __getitem__(self, idx):
-		if idx == 0:
-			return self.min
-		elif idx == 1:
-			return self.max
-		else:
-			raise IndexError
 
 class LexKeyword(LexToken):
 	OPTIONAL 	= 0
@@ -30,7 +20,8 @@ class LexKeyword(LexToken):
 	UNION		= 2
 	def __getitem__(self, idx):
 		return self.__map[idx]
-	def __init__(self, tok):
+	def __init__(self, filename, lineno, tok):
+		LexToken.__init__(self, filename, lineno)
 		self.__map = {"OPTIONAL": self.OPTIONAL,
 				"NOCONSTRUCT": self.NOCONSTRUCT,
 				"union": self.UNION}
@@ -52,7 +43,8 @@ class LexType(LexToken):
 	BLOB		= 5
 	def __getitem__(self, idx):
 		return self.__map[idx]
-	def __init__(self, tok):
+	def __init__(self, filename, lineno, tok):
+		LexToken.__init__(self, filename, lineno)
 		self.__map = {"octet": self.OCTET,
 				"uint8_t": self.UINT8,
 				"uint16_t": self.UINT16,
@@ -72,30 +64,18 @@ class LexType(LexToken):
 		return self.keyword
 
 class LexIdentifier(LexToken):
-	def __init__(self, str):
+	def __init__(self, filename, lineno, str):
+		LexToken.__init__(self, filename, lineno)
 		self.name = str
 	def __str__(self):
 		return self.name
 
-class LexSubscript(LexToken):
-	def __init__(self):
-		self.__item = None
-	def set_subscript(self, tok):
-		if self.__item:
-			raise Exception("Only one token per subscript")
-		self.__item = tok
-	def get_subscript(self):
-		return self.__item
-	def __str__(self):
-		return "[%s]"%self.__item
-
 class LexString(LexToken):
-	def __init__(self, str):
+	def __init__(self, filename, lineno, str):
+		LexToken.__init__(self, filename, lineno)
 		self.__string = filter(lambda x:x != '\n', str)
 	def __str__(self):
 		return "%s"%self.__string
-	def __repr__(self):
-		return "'%s'"%self.__string.replace("'", "\\'")
 
 class LexOpenBrace(LexToken):
 	def __str__(self):
@@ -105,7 +85,18 @@ class LexCloseBrace(LexToken):
 	def __str__(self):
 		return "}"
 
+class LexOpenSub(LexToken):
+	def __str__(self):
+		return "["
+
+class LexCloseSub(LexToken):
+	def __str__(self):
+		return "]"
+
 class LexSemiColon(LexToken):
 	def __str__(self):
 		return ";"
 
+class LexRange(LexToken):
+	def __str__(self):
+		return "-"

@@ -1,176 +1,193 @@
 from tokens import *
+from itertools import tee
 
-class lexer:
-	def __top(self):
-		if not len(self.__toks):
-			return None
-		[ret] = self.__toks[-1:]
-		return ret
+class LexIter:
+	STATE_INIT	= 0
+	STATE_COMMENT	= 1
+	STATE_STRING	= 2
+	STATE_TOK = 3
 
-	def __paste(self, tok):
-		x = self.__toks.pop()
-		self.__toks.append(x[:-1] + tok)
+	def __init__(self, fn):
+		self.filename = fn
+		self.lineno = 0
+		self.__linebuf = ''
+		self.__charbuf = iter('')
+		self.__state = self.STATE_INIT
+		self.__hexmap = {}.fromkeys(
+			[chr(ord('0') + i) for i in xrange(10)] +
+			[chr(ord('a') + i) for i in xrange(6)] +
+			[chr(ord('A') + i) for i in xrange(6)])
+		self.__tokmap = {}.fromkeys(
+			[chr(ord('0') + i) for i in xrange(10)] +
+			[chr(ord('a') + i) for i in xrange(26)] +
+			[chr(ord('A') + i) for i in xrange(26)] +
+			['_'])
 
-	def __append(self, tok):
-		self.__toks.append(tok)
+	def __get_line(self):
+		self.lineno += 1
+		line = self._input.next()
+		if len(line) == 0:
+			raise StopIteration
+		assert(line[-1:] == '\n')
+		if len(line) > 1 and line[:-2] == '\r':
+			line = line[:-2] + '\n'
+		self.__linebuf = line
+		self.__charbuf = iter(line)
 
-	def __extend(self, list):
-		for tok in list:
-			self.__append(tok)
+	def __get_char(self):
+		try:
+			return self.__charbuf.next()
+		except StopIteration:
+			self.__get_line()
+			return self.__charbuf.next()
 
-	def __strip_comments(self, ss):
-		res = []
-		inc = False
-		for s in ss:
-			if not inc and s == '/*':
-				inc = True
-				continue
-			if inc and s == '*/':
-				inc = False
-				continue
-			if not inc:
-				res.append(s)
-		return res
+	def __ishex(self, char):
+		assert(len(char) == 1)
+		return self.__hexmap.has_key(char)
+	def __istok(self, char):
+		assert(len(char) == 1)
+		return self.__tokmap.has_key(char)
 
-	def __paste_strings(self, ss):
-		res = []
-		instr = False
-		str = ''
-		for s in ss:
-			if not instr and s == "'":
-				instr = True
-				str = ''
-				continue
-			if instr:
-				if s == '\n':
+	def __numtok(self, char):
+		(self.__charbuf, it) = tee(self.__charbuf)
+		while True:
+			try:
+				nchar = it.next()
+			except StopIteration:
+				raise Exception("Bad EOL")
+
+			if len(char) == 1:
+				hex = nchar == 'x'
+				if hex:
+					char += nchar
+					self.__get_char()
 					continue
-				if s == "'":
-					if str[-1:] == '\\':
-						str = str[:-1] + s
-						continue
-					else:
-						res.append(LexString(str))
-						instr = False
-						continue
-				else:
-					str = str + s
+
+			if hex:
+				if not self.__ishex(nchar):
+					break
 			else:
-				res.append(s)
-		return res
+				if not nchar.isdigit():
+					break
 
-	def __strip_whitespace(self, ss):
-		return filter(lambda x:not (x.isspace() or x == ''), ss)
+			char += nchar
+			self.__get_char()
 
-	def __split(self, str):
-		res = []
-		inw = False
-		tok = ''
-		for c in str:
-			if not inw and c.isspace():
-				if len(tok):
-					res.append(tok)
-				tok = c
-				inw = True
-				continue
-			if inw and not c.isspace():
-				res.append(tok)
-				tok = c
-				inw = False
-				continue
-			tok = tok + c
-		if len(tok):
-			res.append(tok)
-		return res
+		return LexInteger(self.filename, self.lineno, char)
 
-	def __split_on(self, ss, char):
-		res = []
-		for str in ss:
-			if LexToken in str.__class__.__bases__:
-				res.append(str)
-				continue
-			while len(str):
-				(tok, s, rest) = str.partition(char)
-				if not tok == '':
-					res.append(tok)
-				if s == char:
-					res.append(s)
-				str = rest
-
-		return res
-
-	def __tag_one(self, tok):
-		if LexToken in tok.__class__.__bases__:
-			return tok
-		try:
-			return LexKeyword(tok)
-		except KeyError:
-			pass
-		try:
-			return LexType(tok)
-		except KeyError:
-			pass
-		if tok == '{':
-			return LexOpenBrace()
-		if tok == '}':
-			return LexCloseBrace()
-		if tok == ';':
-			return LexSemiColon()
-		if tok[0].isalpha():
-			return LexIdentifier(tok)
-		if tok[0].isdigit():
-			r = tok.split("-", 1)
-			if len(r) == 1:
-				return LexInteger(r[0])
+	def __strtok(self, char):
+		str = ''
+		in_esc = False
+		while True:
+			nchar = self.__get_char()
+			if not in_esc:
+				if nchar == "\\":
+					in_esc = True
+					continue
+				elif nchar == "'":
+					break
 			else:
-				return LexIntRange(r[0], r[1])
-		print "UNTAGGED: %s"%tok
+				in_esc = False
+			str += nchar
+		return LexString(self.filename, self.lineno, str)
+
+	def __regtok(self, char):
+		(self.__charbuf, it) = tee(self.__charbuf)
+		while True:
+			try:
+				nchar = it.next()
+			except StopIteration:
+				raise Exception("Bad EOL")
+			if not self.__istok(nchar):
+				break
+			char += nchar
+			self.__get_char()
+
+		try:
+			tok = LexKeyword(self.filename, self.lineno, char)
+		except KeyError:
+			try:
+				tok = LexType(self.filename, self.lineno, char)
+			except KeyError:
+				tok = LexIdentifier(self.filename,
+							self.lineno, char)
 		return tok
 
-	def __tag_all(self, tok_stream):
-		res = []
-		insub = False
-		ss = None
-		for tok in tok_stream:
-			if insub:
-				if tok == ']':
-					insub = False
-					res.append(ss)
-				else:
-					ss.set_subscript(self.__tag_one(tok))
-				continue
-			if not insub and tok == '[':
-				insub = True
-				ss = LexSubscript()
-				continue
-			ltok = self.__tag_one(tok)
-			res.append(ltok)
-		return res
+	def __init(self):
+		charmap = {'{':LexOpenBrace,
+			'}':LexCloseBrace,
+			'[':LexOpenSub,
+			']':LexCloseSub,
+			';':LexSemiColon,
+			'-':LexRange,
+		}
 
-	def __tokenize(self, str):
-		ss = []
-		while len(str):
-			(tok, s, rest) = str.partition("'")
-			ss.extend(self.__split(tok))
-			if s == "'":
-				ss.extend(s)
-			str = rest
-		ss = self.__strip_comments(ss)
-		ss = self.__paste_strings(ss)
-		ss = self.__strip_whitespace(ss)
-		ss = self.__split_on(ss, ';')
-		ss = self.__split_on(ss, '{')
-		ss = self.__split_on(ss, '}')
-		ss = self.__split_on(ss, '[')
-		ss = self.__split_on(ss, ']')
-		ss = self.__tag_all(ss)
-		self.__extend(ss)
+		char = self.__get_char()
+		while char.isspace():
+			char = self.__get_char()
+		if charmap.has_key(char):
+			return charmap[char](self.filename, self.lineno)
 
+		if char == '/':
+			char = self.__get_char()
+			assert(char == '*')
+			self.__state = self.STATE_COMMENT
+			return
+
+		if char.isdigit():
+			return self.__numtok(char)
+		elif self.__istok(char):
+			return self.__regtok(char)
+
+		if char == "'":
+			return self.__strtok(char)
+
+		assert(char.isspace())
+
+	def __comment(self):
+		got_star = False
+		while True:
+			char = self.__get_char()
+			if got_star and char == '/':
+				self.__state = self.STATE_INIT
+				return
+			if char == '*':
+				got_star = True
+			else:
+				got_star = False
+
+	def __string(self):
+		return
+	def __tok(self):
+		return
+
+	def next(self):
+		statemap = {self.STATE_INIT: self.__init,
+			self.STATE_COMMENT: self.__comment,
+			self.STATE_STRING: self.__string,
+			self.STATE_TOK: self.__tok,
+			}
+
+		tok = None
+		while not tok:
+			tok = statemap[self.__state]()
+		return tok
+
+class LexIterFile(LexIter):
+	def __init__(self, filename):
+		LexIter.__init__(self, filename)
+		self.__file = open(filename)
+		self._input = self.__file.__iter__()
+
+class LexIterString(LexIter):
+	def __init__(self, str):
+		LexIter.__init__(self, object.__repr__(str))
+		self._input = map(lambda x:x + '\n', str.split('\n'))
+
+class lexer:
 	def __iter__(self):
-		return self.__toks.__iter__()
+		return self.__lex
 
 	def __init__(self, file):
-		lines = file.readlines()
-		lines = map(lambda x:x.rstrip('\r\n'), lines)
-		self.__toks = []
-		self.__tokenize("\n".join(lines))
+		self.__lex = LexIterFile(file)
 		return

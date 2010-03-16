@@ -5,7 +5,12 @@ from sys import stdout,argv
 
 if __name__ == '__main__':
 	for x in argv[1:]:
-		lex = autober.lexer(open(x))
+		lex = autober.lexer(x)
+
+		#for y in lex:
+		#	print "%r"%y
+		#raise SystemExit
+
 		parser = autober.parser(lex)
 		p = parser.parse_tree()
 		ast = autober.semantics(p)

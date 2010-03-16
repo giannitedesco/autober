@@ -47,7 +47,8 @@ class parser:
 		self.__name = ''
 		self.__label = None
 		self.__type = None
-		self.__subscript = None
+		self.__subtokens = None
+		self.__sequence = None
 
 		if tok.__class__ == LexInteger:
 			self.__tagno = int(tok)
@@ -85,11 +86,19 @@ class parser:
 		return True
 
 	def __t_sub(self, tok):
-		if tok.__class__ != LexSubscript:
+		if self.__sequence == None:
+			if tok.__class__ != LexOpenSub:
+				self.__state = self.STATE_T_LABEL
+				self.__sequence = False
+				return False
+			else:
+				self.__sequence = True
+				return True
+		if tok.__class__ == LexCloseSub:
 			self.__state = self.STATE_T_LABEL
-			return False
-		self.__subscript = tok
-		self.__state = self.STATE_T_LABEL
+		else:
+			# TODO: Template arrays
+			raise Exception("Syntax error")
 		return True
 
 	def __t_label(self, tok):
@@ -107,11 +116,17 @@ class parser:
 		return True
 
 	def __f_sub(self, tok):
-		if tok.__class__ != LexSubscript:
+		if self.__subtokens == None:
+			if tok.__class__ != LexOpenSub:
+				self.__state = self.STATE_F_NAME
+				return False
+			else:
+				self.__subtokens = []
+				return True
+		if tok.__class__ == LexCloseSub:
 			self.__state = self.STATE_F_NAME
-			return False
-		self.__subscript = tok
-		self.__state = self.STATE_F_NAME
+		else:
+			self.__subtokens.append(tok)
 		return True
 
 	def __f_name(self, tok):
@@ -132,7 +147,7 @@ class parser:
 			tmpl = Union(self.__name, self.__label)
 		else:
 			tmpl = Template(self.__tagno, self.__name,
-					self.__subscript, self.__label,
+					self.__sequence, self.__label,
 					self.__optional)
 		x = self.__stack.pop()
 		if self.__optional and not self.__union:
@@ -161,15 +176,8 @@ class parser:
 		except KeyError:
 			raise Exception("Unknown type: %s"%self.__type)
 
-		fixd = cls(self.__tagno, self.__name, self.__optional)
-
-		if self.__subscript:
-			ss = self.__subscript.get_subscript()
-			try:
-				fixd.set_subscript(ss)
-			except AttributeError:
-				raise Exception("%s type not subscriptable",
-						str(self.__type))
+		fixd = cls(self.__tagno, self.__name,
+				self.__subtokens, self.__optional)
 
 		x = self.__stack.pop()
 		fixd.parent = x
@@ -181,7 +189,7 @@ class parser:
 		self.__state = self.STATE_TAG
 		return True
 
-	def __parse(self):
+	def __init__(self, lex):
 		transitions = {
 			self.STATE_TAG: self.__tag,
 			self.STATE_FLAGS: self.__flags,
@@ -196,16 +204,14 @@ class parser:
 			self.STATE_ADD: self.__f_add,
 		}
 
-		for tok in self.__iter:
+		self.__state = self.STATE_TAG
+		self.__stack = [Root()]
+
+		for tok in lex:
 			#print "Input token: %s"%tok
 			while not transitions[self.__state](tok):
 				continue
 
-	def __init__(self, lex):
-		self.__state = self.STATE_TAG
-		self.__iter = lex.__iter__()
-		self.__stack = [Root()]
-		self.__parse()
 		r = self.__stack.pop()
 		assert(len(r) == 1)
 		self.__parse_tree = r
