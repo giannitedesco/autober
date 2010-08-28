@@ -94,7 +94,9 @@ class CStructBase:
 		return memb
 
 	def _name_union(self, u):
-		return "%s%s%s"%(self.name, self.prefix, u.name)
+		un = "%s%s%s"%(self.name, self.prefix, u.name)
+		ut = "%s%s_%s_type"%(self.name, self.prefix, u.name)
+		return (un, ut)
 
 	def _name_member(self, ch):
 		if ch.union:
@@ -181,6 +183,13 @@ class CStructBase:
 					"0x%x"%x.tagno)
 		f.write("\n")
 
+	def __union_free(self, f, un, ut, arr):
+		f.write("\tswitch(%s) {\n"%(ut))
+		# bah
+		#for x in arr:
+		#	f.write("\tcase %s"%x.cppname + CPP_)
+		f.write("\t}\n")
+
 	def write_free_func(self, f, check_null = False):
 		for x in self._tags:
 			if x.__class__ == CScalar:
@@ -205,6 +214,8 @@ class CStructBase:
 			x.call_free(f, indent = 2)
 			f.write("\tfree(%s);\n"%x.cname)
 
+		for ((un, ut), arr) in self._unionmap.items():
+			self.__union_free(f, un, ut, arr)
 		for x in self._scab_tags:
 			if x in self._sequences:
 				continue
@@ -248,8 +259,8 @@ class CStructBase:
 						x.cppname,
 						x.__class__.__name__)
 
-		for (uname, arr) in self._unionmap.items():
-			print "  Union %s contains:"%uname
+		for ((un, ut), arr) in self._unionmap.items():
+			print "  Union %s / %s contains:"%(un, ut)
 			for x in arr:
 				print "    - %s: %s"%(x.cname,
 							x.__class__.__name__)
@@ -296,7 +307,7 @@ class CRoot(CStructBase):
 		self._members(root.__iter__())
 
 	def _name_union(self, u):
-		return u.name
+		return (u.name, "_%s_type"%u.name)
 
 	def _name_member(self, ch):
 		if ch.union:
