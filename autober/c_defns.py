@@ -359,7 +359,6 @@ class CRoot(CStructBase):
 			root.cname, root.cname, C_DECODE_FUNC_SUFFIX))
 		f.write("{\n")
 		f.write("}\n")
-		f.write("\n")
 
 	def write_func_decls(self, f):
 		root = self._tags[0]
