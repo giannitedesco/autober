@@ -59,13 +59,21 @@ class CScalar:
 		self.name = node.name
 		self.label = node.name
 		self.constraint = node.constraint
+		if node.__class__ == Blob:
+			self.need_free = True
+		else:
+			self.need_free = False
 	def set_cname(self, name):
 		self.cname = name
 	def set_cppname(self, name):
 		self.cppname = name
+	def set_typename(self, name):
+		if not name == None:
+			self.typename = name
 	def call_free(self, f, indent = 1):
 		tabs = ''.join("\t" for i in xrange(indent))
-		f.write(tabs + "// free(%s); ?? \n"%(self.cname))
+		if self.need_free:
+			f.write(tabs + "free(%s.ptr);\n"%(self.cname))
 
 class CStructBase:
 	def __init__(self, name, label, tagno = None):
@@ -81,6 +89,9 @@ class CStructBase:
 		self.cname = name
 	def set_cppname(self, name):
 		self.cppname = name
+	def set_typename(self, name):
+		if not name == None:
+			self.typename = name
 
 	def __recurse(self, node, union = None):
 		if node.__class__ == Template:
@@ -115,6 +126,15 @@ class CStructBase:
 						ch.name.upper())
 		else:
 			return "%s%s"%(self._macro_prefix, ch.name.upper())
+	
+	def _name_union_member(self, ch):
+		if ch.union:
+			return "%s_%s%s%s"%(self.name.upper(),
+					ch.union.name.upper(),
+					CPP_TYPE_INFIX,
+					ch.name.upper())
+		else:
+			return None
 
 	def _members(self, iter):
 		m = []
@@ -129,6 +149,7 @@ class CStructBase:
 
 		map(lambda x:x.set_cname(self._name_member(x)), m)
 		map(lambda x:x.set_cppname(self._name_macro(x)), m)
+		map(lambda x:x.set_typename(self._name_union_member(x)), m)
 		self._tags = m
 
 		self._tagmap = {}
@@ -185,9 +206,10 @@ class CStructBase:
 
 	def __union_free(self, f, un, ut, arr):
 		f.write("\tswitch(%s) {\n"%(ut))
-		# bah
-		#for x in arr:
-		#	f.write("\tcase %s"%x.cppname + CPP_)
+		for x in arr:
+			f.write("\tcase %s:\n"%x.typename)
+			x.call_free(f, indent = 2)
+			f.write("\t\tbreak;\n")
 		f.write("\t}\n")
 
 	def write_free_func(self, f, check_null = False):
