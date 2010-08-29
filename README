@@ -1,0 +1,19 @@
+Autober - an application specific language for generating BER decoders
+Copyright (c) 2010 Gianni Tedesco
+
+0. INTRO
+--------
+autober is a language for generating BER decoders. It's different from an ASN.1
+compiler in that it's much simpler and it only deals with BER encoded messages.
+It is intended for smartcard and RFID applications where much of the data
+stored on these devices is, in-fact, BER encoded TLV data. The language is
+designed to be very similar to the template definitions found in the
+specifications for smartcard and RFID applications.
+
+2. BUILDING
+-----------
+$ make
+
+3. EVERYTHING ELSE
+------------------
+Use the source luke
