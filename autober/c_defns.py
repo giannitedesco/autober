@@ -12,11 +12,11 @@ def preproc_define(f, name, val):
 	f.write("#define %-30s %s\n"%(name, val))
 
 class CTagStruct:
-	def __init__(self, label, cpptag, union = False):
+	def __init__(self, label, cpptag, union = False, optional = False):
 		self.label = label
 		self.cpptag = cpptag
 		self.union = union
-		self.optional = False
+		self.optional = optional
 		self.check_size = False
 
 		self.template = None
@@ -59,6 +59,7 @@ class CScalar:
 		self.name = node.name
 		self.label = node.name
 		self.constraint = node.constraint
+		self.optional = node.optional
 		if node.__class__ == Blob:
 			self.need_free = True
 		else:
@@ -70,13 +71,16 @@ class CScalar:
 	def set_typename(self, name):
 		if not name == None:
 			self.typename = name
+	def set_optvar(self, name):
+		if self.optional:
+			self.optvar = name
 	def call_free(self, f, indent = 1):
 		tabs = ''.join("\t" for i in xrange(indent))
 		if self.need_free:
 			f.write(tabs + "free(%s.ptr);\n"%(self.cname))
 
 class CStructBase:
-	def __init__(self, name, label, tagno = None):
+	def __init__(self, name, label, tagno = None, optional = False):
 		self.name = name
 		self.label = label
 		self.tagno = tagno
@@ -84,11 +88,15 @@ class CStructBase:
 		self.tagblock_name = "%s%s"%(self.name, C_TAGBLOCK_SUFFIX)
 		self.free_func = "_free_%s"%(self.name)
 		self.decode_func = "_%s"%(self.name)
+		self.optional = optional
 	
 	def set_cname(self, name):
 		self.cname = name
 	def set_cppname(self, name):
 		self.cppname = name
+	def set_optvar(self, name):
+		if self.optional:
+			self.optvar = name
 	def set_typename(self, name):
 		if not name == None:
 			self.typename = name
@@ -115,6 +123,9 @@ class CStructBase:
 						ch.union.name, ch.name)
 		else:
 			return "%s%s%s"%(self.name, self.prefix, ch.name)
+
+	def _name_optvar(self, ch):
+		return "%s%s%s"%(self.name, self.prefix, "_present")
 
 	def _name_count_var(self, ch):
 		return "%s%s_%s_count"%(self.name, self.prefix, ch.name)
@@ -150,6 +161,7 @@ class CStructBase:
 		map(lambda x:x.set_cname(self._name_member(x)), m)
 		map(lambda x:x.set_cppname(self._name_macro(x)), m)
 		map(lambda x:x.set_typename(self._name_union_member(x)), m)
+		map(lambda x:x.set_optvar(self._name_optvar(x)), m)
 		self._tags = m
 
 		self._tagmap = {}
@@ -183,7 +195,8 @@ class CStructBase:
 		for x in self._tags:
 			tagstruct = CTagStruct(x.label,
 						x.cppname + CPP_TAG_SUFFIX,
-						x.union != None)
+						x.union != None,
+						x.optional)
 			if x.__class__ == CStruct:
 				tagstruct.set_template(sequence = False)
 			elif x.__class__ == CStructPtr:
@@ -241,7 +254,13 @@ class CStructBase:
 		for x in self._scab_tags:
 			if x in self._sequences:
 				continue
-			x.call_free(f)
+			if x.optional:
+				f.write("\tif ( %s & %s) {\n"%(x.optvar,
+								x.cppname))
+				x.call_free(f, indent = 2)
+				f.write("\t}\n")
+			else:
+				x.call_free(f)
 
 		if check_null:
 			f.write("\tfree(%s);\n"%self.cname)
@@ -289,7 +308,13 @@ class CStructBase:
 							x.__class__.__name__)
 		print "  Non-union tags:"
 		for x in self._scab_tags:
-			print "    - %s: %s"%(x.cname, x.__class__.__name__)
+			if x.optional:
+				print "    - %s: %s selected by %s"%(x.cname,
+							x.__class__.__name__,
+							x.cppname)
+			else:
+				print "    - %s: %s"%(x.cname,
+							x.__class__.__name__)
 
 class CStruct(CStructBase):
 	def call_free(self, f, indent = 1):
@@ -299,7 +324,8 @@ class CStruct(CStructBase):
 	def __init__(self, node, union = None):
 		assert(node.__class__ == Template)
 		assert(node.sequence == False)
-		CStructBase.__init__(self, node.name, node.label, node.tag)
+		CStructBase.__init__(self, node.name, node.label,
+					node.tag, node.optional)
 		self.union = union
 		self._macro_prefix = self.name.upper() + "_"
 		self._members(node.__iter__())
@@ -315,7 +341,8 @@ class CStructPtr(CStructBase):
 	def __init__(self, node):
 		assert(node.__class__ == Template)
 		assert(node.sequence == True)
-		CStructBase.__init__(self, node.name, node.label, node.tag)
+		CStructBase.__init__(self, node.name, node.label,
+					node.tag, node.optional)
 		self._macro_prefix = self.name.upper() + "_"
 		self._members(node.__iter__())
 		self.union = None
