@@ -272,7 +272,14 @@ class CStructBase:
 			if x.__class__ == CScalar:
 				continue
 			x.write_decode_func(f)
-		f.write("/* Decode func for %s */\n"%self)
+		f.write("/* Decode func for %s */\n"%self.name)
+		f.write("static int _%s_decode(struct %s *%s)\n"%(self.name,
+								self.name,
+								self.name))
+		f.write("{\n")
+		f.write("\treturn 0;\n")
+		f.write("}\n")
+		f.write("\n")
 
 	def __str__(self):
 		return self.name
@@ -351,7 +358,8 @@ class CRoot(CStructBase):
 	def __init__(self, root, modname):
 		assert(root.__class__ == Root)
 		assert(len(root) == 1)
-		CStructBase.__init__(self, "root_", "Autober root node")
+		CStructBase.__init__(self, root[0].name, "Autober root node")
+		self.tagblock_name = 'root_' + self.tagblock_name
 		self._macro_prefix = ''
 		self.prefix = ''
 		self._members(root.__iter__())
@@ -378,14 +386,14 @@ class CRoot(CStructBase):
 
 	def write_decode_func(self, f):
 		root = self._tags[0]
-		root.write_decode_func(f)
 
-		CStructBase.write_decode_func(self, f)
+		CStructBase.write_decode_func(root, f)
 
 		f.write("/* Decode func for %s module */\n"%root.cname)
 		f.write("struct %s *%s%s(const uint8_t *ptr, size_t len)\n"%(
 			root.cname, root.cname, C_DECODE_FUNC_SUFFIX))
 		f.write("{\n")
+		f.write("\treturn NULL;\n")
 		f.write("}\n")
 
 	def write_func_decls(self, f):
