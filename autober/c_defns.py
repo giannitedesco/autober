@@ -284,7 +284,8 @@ class CStructBase:
 		for ((un, ut), arr) in self._unionmap.items():
 			print "  Union %s / %s contains:"%(un, ut)
 			for x in arr:
-				print "    - %s: %s"%(x.cname,
+				print "    - [%s] %s: %s"%(x.typename,
+							x.cname,
 							x.__class__.__name__)
 		print "  Non-union tags:"
 		for x in self._scab_tags:
