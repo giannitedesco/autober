@@ -74,6 +74,8 @@ class CScalar:
 	def set_optvar(self, name):
 		if self.optional:
 			self.optvar = name
+	def call_decode(self, var):
+		return '1'
 	def call_free(self, f, indent = 1):
 		tabs = ''.join('\t' for i in xrange(indent))
 		if self.need_free:
@@ -267,6 +269,10 @@ class CStructBase:
 		f.write('}\n')
 		f.write('\n')
 
+	def call_decode(self, var):
+		return '_%s_decode(%s, ptr, tag.ber_len)'%(
+			self.name, var)
+
 	def write_decode_func(self, f):
 		for x in self._tags:
 			if isinstance(x, CScalar):
@@ -291,6 +297,40 @@ class CStructBase:
 		f.write('\t\treturn 0;\n')
 		f.write('\t}\n')
 		f.write('\n')
+
+		f.write('\tfor(end = ptr + len; ptr < end; '
+			'ptr += tag.ber_len) {\n')
+		f.write('\t\tptr = ber_decode_tag(&tag, ptr, end - ptr);\n')
+		f.write('\t\tif ( NULL == ptr )\n')
+		f.write('\t\t\treturn 0;\n')
+		f.write('\n')
+		f.write('\t\tswitch(tag.ber_tag) {\n')
+		for x in self._tags:
+			f.write('\t\tcase %s:\n'%(x.cppname + CPP_TAG_SUFFIX))
+			if isinstance(x, CStructPtr):
+				var = '&%s->%s[%s]'%(self.name, x.name,
+							x.count_var)
+			else:
+				var = '&%s->%s'%(self.name, x.name)
+			f.write('\t\t\tif ( !%s )\n'%x.call_decode(var))
+			f.write('\t\t\t\treturn 0;')
+			f.write('\n')
+			if isinstance(x, CStructPtr):
+				f.write('\t\t\t%s++;\n'%x.count_var)
+			if x.optional:
+				f.write('\t\t\t%s |= %s;\n'%(
+					x.optvar, x.cppname))
+			if x.union:
+				(un,ut) = self._name_union(x.union)
+				f.write('\t\t\t%s = %s;\n'%(ut, x.typename))
+			f.write('\t\t\tbreak;\n')
+		f.write('\t\tdefault:\n')
+		f.write('\t\t\tfprintf(stderr, "Unexpected tag: '
+			'%s: 0x%%x\\n",\n'
+			'\t\t\t\ttag.ber_tag);\n'%self.name)
+		f.write('\t\t\tcontinue;\n')
+		f.write('\t\t}\n')
+		f.write('\t}\n')
 		f.write('\treturn 1;\n')
 		f.write('}\n')
 		f.write('\n')
@@ -407,18 +447,20 @@ class CRoot(CStructBase):
 		f.write('struct %s *%s%s(const uint8_t *ptr, size_t len)\n'%(
 			root.cname, root.cname, C_DECODE_FUNC_SUFFIX))
 		f.write('{\n')
-		f.write('\tstruct %s *obj;\n'%root.cname)
+		f.write('\tstruct %s *%s;\n'%(root.cname, root.cname))
 		f.write('\n')
-		f.write('\tobj = calloc(1, sizeof(*obj));\n')
-		f.write('\tif ( NULL == obj )\n')
+		f.write('\t%s = calloc(1, sizeof(*%s));\n'%(
+			root.cname, root.cname))
+		f.write('\tif ( NULL == %s )\n'%root.cname)
 		f.write('\t\treturn NULL;\n')
 		f.write('\n')
-		f.write('\tif ( !_%s_decode(obj, ptr, len) ) {\n'%root.name)
-		f.write('\t\t_free_%s(obj);\n'%root.name)
+		f.write('\tif ( !_%s_decode(%s, ptr, len) ) {\n'%(
+			root.cname, root.name))
+		f.write('\t\t_free_%s(%s);\n'%(root.name,root.cname))
 		f.write('\t\treturn NULL;\n')
 		f.write('\t}\n')
 		f.write('\n')
-		f.write('\treturn obj;\n')
+		f.write('\treturn %s;\n'%root.cname)
 		f.write('}\n')
 
 	def write_func_decls(self, f):
