@@ -273,9 +273,10 @@ class CStructBase:
 				continue
 			x.write_decode_func(f)
 		f.write('/* Decode func for %s */\n'%self.name)
-		f.write('static int _%s_decode(struct %s *%s)\n'%(self.name,
+		f.write('static int _%s_decode(struct %s *%s,\n'%(self.name,
 								self.name,
 								self.name))
+		f.write('\t\t\tconst uint8_t *ptr, size_t len)\n')
 		f.write('{\n')
 		f.write('\treturn 0;\n')
 		f.write('}\n')
@@ -393,7 +394,15 @@ class CRoot(CStructBase):
 		f.write('struct %s *%s%s(const uint8_t *ptr, size_t len)\n'%(
 			root.cname, root.cname, C_DECODE_FUNC_SUFFIX))
 		f.write('{\n')
-		f.write('\treturn NULL;\n')
+		f.write('\tstruct %s *obj;\n'%root.cname)
+		f.write('\tobj = calloc(1, sizeof(*obj));\n')
+		f.write('\tif ( NULL == obj )\n')
+		f.write('\t\treturn NULL;\n')
+		f.write('\tif ( !_%s_decode(obj, ptr, len) ) {\n'%root.name)
+		f.write('\t\t_free_%s(obj);\n'%root.name)
+		f.write('\t\treturn NULL;\n')
+		f.write('\t}\n')
+		f.write('\treturn obj;\n')
 		f.write('}\n')
 
 	def write_func_decls(self, f):
