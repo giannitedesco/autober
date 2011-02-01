@@ -1,15 +1,15 @@
 from syntax import *
 
-CPP_TAG_SUFFIX		= "_TAG"
+CPP_TAG_SUFFIX		= '_TAG'
 CPP_PRESENCE_SUFFIX	= ''
-CPP_TYPE_INFIX		= "_TYPE_"
+CPP_TYPE_INFIX		= '_TYPE_'
 
-C_TAGBLOCK_SUFFIX	= "_tags"
-C_DECODE_FUNC_SUFFIX	= "_decode"
-C_FREE_FUNC_SUFFIX	= "_free"
+C_TAGBLOCK_SUFFIX	= '_tags'
+C_DECODE_FUNC_SUFFIX	= '_decode'
+C_FREE_FUNC_SUFFIX	= '_free'
 
 def preproc_define(f, name, val):
-	f.write("#define %-30s %s\n"%(name, val))
+	f.write('#define %-30s %s\n'%(name, val))
 
 class CTagStruct:
 	def __init__(self, label, cpptag, union = False, optional = False):
@@ -24,16 +24,16 @@ class CTagStruct:
 	def flags(self):
 		list = []
 		if self.template:
-			list.append("AUTOBER_TEMPLATE")
+			list.append('AUTOBER_TEMPLATE')
 			if self.sequence:
-				list.append("AUTOBER_SEQUENCE")
+				list.append('AUTOBER_SEQUENCE')
 		if self.union:
-			list.append("AUTOBER_UNION")
+			list.append('AUTOBER_UNION')
 		if self.optional:
-			list.append("AUTOBER_OPTIONAL")
+			list.append('AUTOBER_OPTIONAL')
 		if self.check_size:
-			list.append("AUTOBER_CHECK_SIZE")
-		return "|".join(list)
+			list.append('AUTOBER_CHECK_SIZE')
+		return '|'.join(list)
 
 	def set_template(self, sequence = False):
 		self.template = True
@@ -45,12 +45,12 @@ class CTagStruct:
 		self.constraint = (min, max)
 
 	def write(self, f):
-		f.write("\t{.ab_label = \"%s\",\n"%self.label)
+		f.write('\t{.ab_label = "%s",\n'%self.label)
 		if self.flags() != '':
-			f.write("\t\t.ab_flags = %s,\n"%self.flags())
+			f.write('\t\t.ab_flags = %s,\n'%self.flags())
 		if self.check_size:
-			f.write("\t\t.ab_size = {%u, %u},\n"%self.constraint)
-		f.write("\t\t.ab_tag = %s},\n"%self.cpptag)
+			f.write('\t\t.ab_size = {%u, %u},\n'%self.constraint)
+		f.write('\t\t.ab_tag = %s},\n'%self.cpptag)
 
 class CScalar:
 	def __init__(self, node, union = None):
@@ -75,19 +75,19 @@ class CScalar:
 		if self.optional:
 			self.optvar = name
 	def call_free(self, f, indent = 1):
-		tabs = ''.join("\t" for i in xrange(indent))
+		tabs = ''.join('\t' for i in xrange(indent))
 		if self.need_free:
-			f.write(tabs + "free(%s.ptr);\n"%(self.cname))
+			f.write(tabs + 'free(%s.ptr);\n'%(self.cname))
 
 class CStructBase:
 	def __init__(self, name, label, tagno = None, optional = False):
 		self.name = name
 		self.label = label
 		self.tagno = tagno
-		self.prefix = "->"
-		self.tagblock_name = "%s%s"%(self.name, C_TAGBLOCK_SUFFIX)
-		self.free_func = "_free_%s"%(self.name)
-		self.decode_func = "_%s"%(self.name)
+		self.prefix = '->'
+		self.tagblock_name = '%s%s'%(self.name, C_TAGBLOCK_SUFFIX)
+		self.free_func = '_free_%s'%(self.name)
+		self.decode_func = '_%s'%(self.name)
 		self.optional = optional
 	
 	def set_cname(self, name):
@@ -113,34 +113,34 @@ class CStructBase:
 		return memb
 
 	def _name_union(self, u):
-		un = "%s%s%s"%(self.name, self.prefix, u.name)
-		ut = "%s%s_%s_type"%(self.name, self.prefix, u.name)
+		un = '%s%s%s'%(self.name, self.prefix, u.name)
+		ut = '%s%s_%s_type'%(self.name, self.prefix, u.name)
 		return (un, ut)
 
 	def _name_member(self, ch):
 		if ch.union:
-			return "%s%s%s.%s"%(self.name, self.prefix,
+			return '%s%s%s.%s'%(self.name, self.prefix,
 						ch.union.name, ch.name)
 		else:
-			return "%s%s%s"%(self.name, self.prefix, ch.name)
+			return '%s%s%s'%(self.name, self.prefix, ch.name)
 
 	def _name_optvar(self, ch):
-		return "%s%s%s"%(self.name, self.prefix, "_present")
+		return '%s%s%s'%(self.name, self.prefix, '_present')
 
 	def _name_count_var(self, ch):
-		return "%s%s_%s_count"%(self.name, self.prefix, ch.name)
+		return '%s%s_%s_count'%(self.name, self.prefix, ch.name)
 
 	def _name_macro(self, ch):
 		if ch.union:
-			return "%s%s_%s"%(self._macro_prefix,
+			return '%s%s_%s'%(self._macro_prefix,
 						ch.union.name.upper(),
 						ch.name.upper())
 		else:
-			return "%s%s"%(self._macro_prefix, ch.name.upper())
+			return '%s%s'%(self._macro_prefix, ch.name.upper())
 	
 	def _name_union_member(self, ch):
 		if ch.union:
-			return "%s_%s%s%s"%(self.name.upper(),
+			return '%s_%s%s%s'%(self.name.upper(),
 					ch.union.name.upper(),
 					CPP_TYPE_INFIX,
 					ch.name.upper())
@@ -189,8 +189,8 @@ class CStructBase:
 				continue
 			x.write_tagblock(f)
 
-		f.write("/* Tags for %s */\n"%self)
-		f.write("static const struct autober_tag %s[] = {\n"%
+		f.write('/* Tags for %s */\n'%self)
+		f.write('static const struct autober_tag %s[] = {\n'%
 			self.tagblock_name)
 		for x in self._tags:
 			tagstruct = CTagStruct(x.label,
@@ -204,26 +204,26 @@ class CStructBase:
 			elif x.constraint != None:
 				tagstruct.set_sizes(*x.constraint)
 			tagstruct.write(f)
-		f.write("};\n\n")
+		f.write('};\n\n')
 
 	def write_tag_macros(self, f):
 		for x in self._tags:
 			if x.__class__ == CScalar:
 				continue
 			x.write_tag_macros(f)
-		f.write("/* Tag numbers for %s */\n"%self)
+		f.write('/* Tag numbers for %s */\n'%self)
 		for x in self._tags:
 			preproc_define(f, x.cppname + CPP_TAG_SUFFIX,
-					"0x%x"%x.tagno)
-		f.write("\n")
+					'0x%x'%x.tagno)
+		f.write('\n')
 
 	def __union_free(self, f, un, ut, arr):
-		f.write("\tswitch(%s) {\n"%(ut))
+		f.write('\tswitch(%s) {\n'%(ut))
 		for x in arr:
-			f.write("\tcase %s:\n"%x.typename)
+			f.write('\tcase %s:\n'%x.typename)
 			x.call_free(f, indent = 2)
-			f.write("\t\tbreak;\n")
-		f.write("\t}\n")
+			f.write('\t\tbreak;\n')
+		f.write('\t}\n')
 
 	def write_free_func(self, f, check_null = False):
 		for x in self._tags:
@@ -231,23 +231,23 @@ class CStructBase:
 				continue
 			x.write_free_func(f)
 
-		f.write("/* Free func for %s */\n"%self)
-		f.write("static void %s(struct %s *%s)\n"%(
+		f.write('/* Free func for %s */\n'%self)
+		f.write('static void %s(struct %s *%s)\n'%(
 			self.free_func, self.name, self.name))
-		f.write("{\n")
+		f.write('{\n')
 
 		if len(self._sequences):
-			f.write("\tunsigned int i;\n\n");
+			f.write('\tunsigned int i;\n\n');
 
 		if check_null:
-			f.write("\tif ( NULL == %s )\n"%str(self))
-			f.write("\t\treturn;\n\n")
+			f.write('\tif ( NULL == %s )\n'%str(self))
+			f.write('\t\treturn;\n\n')
 
 		for x in self._sequences:
-			f.write("\tfor(i = 0; i < %s; i++)\n"%(
+			f.write('\tfor(i = 0; i < %s; i++)\n'%(
 						x.count_var))
 			x.call_free(f, indent = 2)
-			f.write("\tfree(%s);\n"%x.cname)
+			f.write('\tfree(%s);\n'%x.cname)
 
 		for ((un, ut), arr) in self._unionmap.items():
 			self.__union_free(f, un, ut, arr)
@@ -255,31 +255,31 @@ class CStructBase:
 			if x in self._sequences:
 				continue
 			if x.optional:
-				f.write("\tif ( %s & %s) {\n"%(x.optvar,
+				f.write('\tif ( %s & %s) {\n'%(x.optvar,
 								x.cppname))
 				x.call_free(f, indent = 2)
-				f.write("\t}\n")
+				f.write('\t}\n')
 			else:
 				x.call_free(f)
 
 		if check_null:
-			f.write("\tfree(%s);\n"%self.cname)
-		f.write("}\n")
-		f.write("\n")
+			f.write('\tfree(%s);\n'%self.cname)
+		f.write('}\n')
+		f.write('\n')
 
 	def write_decode_func(self, f):
 		for x in self._tags:
 			if x.__class__ == CScalar:
 				continue
 			x.write_decode_func(f)
-		f.write("/* Decode func for %s */\n"%self.name)
-		f.write("static int _%s_decode(struct %s *%s)\n"%(self.name,
+		f.write('/* Decode func for %s */\n'%self.name)
+		f.write('static int _%s_decode(struct %s *%s)\n'%(self.name,
 								self.name,
 								self.name))
-		f.write("{\n")
-		f.write("\treturn 0;\n")
-		f.write("}\n")
-		f.write("\n")
+		f.write('{\n')
+		f.write('\treturn 0;\n')
+		f.write('}\n')
+		f.write('\n')
 
 	def __str__(self):
 		return self.name
@@ -297,36 +297,36 @@ class CStructBase:
 			x.pretty_print()
 
 		print
-		print "%s instance: %s"%(self.__class__.__name__,
+		print '%s instance: %s'%(self.__class__.__name__,
 					self.name)
-		print "Free func: %s"%self.free_func
-		print "Decode func: %s"%self.decode_func
+		print 'Free func: %s'%self.free_func
+		print 'Decode func: %s'%self.decode_func
 
 		for (k, x) in self._tagmap.items():
-			print "  Tag 0x%x: %s / %s: %s"%(k, x.cname,
+			print '  Tag 0x%x: %s / %s: %s'%(k, x.cname,
 						x.cppname,
 						x.__class__.__name__)
 
 		for ((un, ut), arr) in self._unionmap.items():
-			print "  Union %s / %s contains:"%(un, ut)
+			print '  Union %s / %s contains:'%(un, ut)
 			for x in arr:
-				print "    - [%s] %s: %s"%(x.typename,
+				print '    - [%s] %s: %s'%(x.typename,
 							x.cname,
 							x.__class__.__name__)
-		print "  Non-union tags:"
+		print '  Non-union tags:'
 		for x in self._scab_tags:
 			if x.optional:
-				print "    - %s: %s selected by %s"%(x.cname,
+				print '    - %s: %s selected by %s'%(x.cname,
 							x.__class__.__name__,
 							x.cppname)
 			else:
-				print "    - %s: %s"%(x.cname,
+				print '    - %s: %s'%(x.cname,
 							x.__class__.__name__)
 
 class CStruct(CStructBase):
 	def call_free(self, f, indent = 1):
-		tabs = ''.join("\t" for i in xrange(indent))
-		f.write(tabs + "%s(&%s);\n"%(self.free_func, self.cname))
+		tabs = ''.join('\t' for i in xrange(indent))
+		f.write(tabs + '%s(&%s);\n'%(self.free_func, self.cname))
 
 	def __init__(self, node, union = None):
 		assert(node.__class__ == Template)
@@ -334,13 +334,13 @@ class CStruct(CStructBase):
 		CStructBase.__init__(self, node.name, node.label,
 					node.tag, node.optional)
 		self.union = union
-		self._macro_prefix = self.name.upper() + "_"
+		self._macro_prefix = self.name.upper() + '_'
 		self._members(node.__iter__())
 
 class CStructPtr(CStructBase):
 	def call_free(self, f, indent = 1):
-		tabs = ''.join("\t" for i in xrange(indent))
-		f.write(tabs + "%s(&%s[i]);\n"%(self.free_func, self.cname))
+		tabs = ''.join('\t' for i in xrange(indent))
+		f.write(tabs + '%s(&%s[i]);\n'%(self.free_func, self.cname))
 
 	def set_count_var(self, cname):
 		self.count_var = cname
@@ -350,7 +350,7 @@ class CStructPtr(CStructBase):
 		assert(node.sequence == True)
 		CStructBase.__init__(self, node.name, node.label,
 					node.tag, node.optional)
-		self._macro_prefix = self.name.upper() + "_"
+		self._macro_prefix = self.name.upper() + '_'
 		self._members(node.__iter__())
 		self.union = None
 
@@ -358,49 +358,49 @@ class CRoot(CStructBase):
 	def __init__(self, root, modname):
 		assert(root.__class__ == Root)
 		assert(len(root) == 1)
-		CStructBase.__init__(self, root[0].name, "Autober root node")
+		CStructBase.__init__(self, root[0].name, 'Autober root node')
 		self.tagblock_name = 'root_' + self.tagblock_name
 		self._macro_prefix = ''
 		self.prefix = ''
 		self._members(root.__iter__())
 
 	def _name_union(self, u):
-		return (u.name, "_%s_type"%u.name)
+		return (u.name, '_%s_type'%u.name)
 
 	def _name_member(self, ch):
 		if ch.union:
-			return "%s.%s"%(ch.union.name, ch.name)
+			return '%s.%s'%(ch.union.name, ch.name)
 		else:
 			return ch.name
 
 	def write_free_func(self, f):
 		root = self._tags[0]
 		root.write_free_func(f, check_null = True)
-		f.write("/* Free func for %s module */\n"%root.cname)
-		f.write("void %s%s(struct %s *%s)\n"%(root.cname,
+		f.write('/* Free func for %s module */\n'%root.cname)
+		f.write('void %s%s(struct %s *%s)\n'%(root.cname,
 			C_FREE_FUNC_SUFFIX, root.cname, root.cname))
-		f.write("{\n")
-		f.write("\t%s(%s);\n"%(root.free_func, root.cname))
-		f.write("}\n")
-		f.write("\n")
+		f.write('{\n')
+		f.write('\t%s(%s);\n'%(root.free_func, root.cname))
+		f.write('}\n')
+		f.write('\n')
 
 	def write_decode_func(self, f):
 		root = self._tags[0]
 
 		CStructBase.write_decode_func(root, f)
 
-		f.write("/* Decode func for %s module */\n"%root.cname)
-		f.write("struct %s *%s%s(const uint8_t *ptr, size_t len)\n"%(
+		f.write('/* Decode func for %s module */\n'%root.cname)
+		f.write('struct %s *%s%s(const uint8_t *ptr, size_t len)\n'%(
 			root.cname, root.cname, C_DECODE_FUNC_SUFFIX))
-		f.write("{\n")
-		f.write("\treturn NULL;\n")
-		f.write("}\n")
+		f.write('{\n')
+		f.write('\treturn NULL;\n')
+		f.write('}\n')
 
 	def write_func_decls(self, f):
 		root = self._tags[0]
-		f.write("struct %s *%s%s(const uint8_t *ptr, size_t len);\n"%(
+		f.write('struct %s *%s%s(const uint8_t *ptr, size_t len);\n'%(
 			root.cname, root.cname, C_DECODE_FUNC_SUFFIX))
-		f.write("void %s%s(struct %s *%s);\n"%(root.cname,
+		f.write('void %s%s(struct %s *%s);\n'%(root.cname,
 			C_FREE_FUNC_SUFFIX, root.cname, root.cname))
 
 class CDefinitions:
