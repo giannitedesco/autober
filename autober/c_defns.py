@@ -60,7 +60,7 @@ class CScalar:
 		self.label = node.name
 		self.constraint = node.constraint
 		self.optional = node.optional
-		if node.__class__ == Blob:
+		if isinstance(node, Blob):
 			self.need_free = True
 		else:
 			self.need_free = False
@@ -102,7 +102,7 @@ class CStructBase:
 			self.typename = name
 
 	def __recurse(self, node, union = None):
-		if node.__class__ == Template:
+		if isinstance(node, Template):
 			if node.sequence:
 				assert(union == None)
 				memb = CStructPtr(node)
@@ -150,7 +150,7 @@ class CStructBase:
 	def _members(self, iter):
 		m = []
 		for x in iter:
-			if x.__class__ == Union:
+			if isinstance(x, Union):
 				for y in x:
 					memb = self.__recurse(y, union = x)
 					m.append(memb)
@@ -170,7 +170,7 @@ class CStructBase:
 
 		self._scab_tags = filter(lambda x:not x.union, self._tags)
 
-		self._sequences = filter(lambda x:x.__class__ == CStructPtr,
+		self._sequences = filter(lambda x:isinstance(x, CStructPtr),
 					self._scab_tags)
 		for seq in self._sequences:
 			seq.set_count_var(self._name_count_var(seq))
@@ -185,7 +185,7 @@ class CStructBase:
 
 	def write_tagblock(self, f):
 		for x in self._tags:
-			if x.__class__ == CScalar:
+			if isinstance(x, CScalar):
 				continue
 			x.write_tagblock(f)
 
@@ -197,9 +197,9 @@ class CStructBase:
 						x.cppname + CPP_TAG_SUFFIX,
 						x.union != None,
 						x.optional)
-			if x.__class__ == CStruct:
+			if isinstance(x, CStruct):
 				tagstruct.set_template(sequence = False)
-			elif x.__class__ == CStructPtr:
+			elif isinstance(x, CStructPtr):
 				tagstruct.set_template(sequence = True)
 			elif x.constraint != None:
 				tagstruct.set_sizes(*x.constraint)
@@ -208,7 +208,7 @@ class CStructBase:
 
 	def write_tag_macros(self, f):
 		for x in self._tags:
-			if x.__class__ == CScalar:
+			if isinstance(x, CScalar):
 				continue
 			x.write_tag_macros(f)
 		f.write('/* Tag numbers for %s */\n'%self)
@@ -227,7 +227,7 @@ class CStructBase:
 
 	def write_free_func(self, f, check_null = False):
 		for x in self._tags:
-			if x.__class__ == CScalar:
+			if isinstance(x, CScalar):
 				continue
 			x.write_free_func(f)
 
@@ -269,7 +269,7 @@ class CStructBase:
 
 	def write_decode_func(self, f):
 		for x in self._tags:
-			if x.__class__ == CScalar:
+			if isinstance(x, CScalar):
 				continue
 			x.write_decode_func(f)
 		f.write('/* Decode func for %s */\n'%self.name)
@@ -306,7 +306,7 @@ class CStructBase:
 
 	def pretty_print(self):
 		for x in self._tags:
-			if x.__class__ == CScalar:
+			if isinstance(x, CScalar):
 				continue
 			x.pretty_print()
 
@@ -343,7 +343,7 @@ class CStruct(CStructBase):
 		f.write(tabs + '%s(&%s);\n'%(self.free_func, self.cname))
 
 	def __init__(self, node, union = None):
-		assert(node.__class__ == Template)
+		assert(isinstance(node, Template))
 		assert(node.sequence == False)
 		CStructBase.__init__(self, node.name, node.label,
 					node.tag, node.optional)
@@ -360,7 +360,7 @@ class CStructPtr(CStructBase):
 		self.count_var = cname
 
 	def __init__(self, node):
-		assert(node.__class__ == Template)
+		assert(isinstance(node, Template))
 		assert(node.sequence == True)
 		CStructBase.__init__(self, node.name, node.label,
 					node.tag, node.optional)
