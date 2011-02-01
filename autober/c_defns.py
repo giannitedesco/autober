@@ -278,7 +278,20 @@ class CStructBase:
 								self.name))
 		f.write('\t\t\tconst uint8_t *ptr, size_t len)\n')
 		f.write('{\n')
-		f.write('\treturn 0;\n')
+		f.write('\tstatic const unsigned int num = '
+			'AUTOBER_NUM_TAGS(%s_tags);\n'%self.name)
+		f.write('\tstruct autober_constraint cons[num];\n')
+		f.write('\tstruct gber_tag tag;\n')
+		f.write('\tconst uint8_t *end;\n')
+		f.write('\n')
+		f.write('\tif ( !autober_constraints(%s_tags, cons, '
+			'num, ptr, len) ) {\n'%self.name)
+		f.write('\t\tfprintf(stderr, "%s: '
+			'constraints not satisified\\n");\n'%self.name)
+		f.write('\t\treturn 0;\n')
+		f.write('\t}\n')
+		f.write('\n')
+		f.write('\treturn 1;\n')
 		f.write('}\n')
 		f.write('\n')
 
@@ -395,13 +408,16 @@ class CRoot(CStructBase):
 			root.cname, root.cname, C_DECODE_FUNC_SUFFIX))
 		f.write('{\n')
 		f.write('\tstruct %s *obj;\n'%root.cname)
+		f.write('\n')
 		f.write('\tobj = calloc(1, sizeof(*obj));\n')
 		f.write('\tif ( NULL == obj )\n')
 		f.write('\t\treturn NULL;\n')
+		f.write('\n')
 		f.write('\tif ( !_%s_decode(obj, ptr, len) ) {\n'%root.name)
 		f.write('\t\t_free_%s(obj);\n'%root.name)
 		f.write('\t\treturn NULL;\n')
 		f.write('\t}\n')
+		f.write('\n')
 		f.write('\treturn obj;\n')
 		f.write('}\n')
 
