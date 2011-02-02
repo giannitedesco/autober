@@ -60,10 +60,26 @@ class CScalar:
 		self.label = node.name
 		self.constraint = node.constraint
 		self.optional = node.optional
+		self.need_free = False
 		if isinstance(node, Blob):
 			self.need_free = True
+			self.dfunc = 'autober_blob(%(var)s, &tag, ptr)'
+		elif isinstance(node, Uint):
+			self.dfunc = 'autober_u%d(%%(var)s, &tag, ' \
+					'ptr, %%(countvar)s)'%\
+					node.bits
 		else:
-			self.need_free = False
+			assert(False)
+
+		if node.constraint is not None:
+			self.array_sz = node.constraint[1] / node.bytes
+			if self.array_sz == 1:
+				self.array_sz = 0
+		else:
+			self.array_sz = 0
+
+	def set_count_var(self, cname):
+		self.count_var = cname
 	def set_cname(self, name):
 		self.cname = name
 	def set_cppname(self, name):
@@ -74,8 +90,11 @@ class CScalar:
 	def set_optvar(self, name):
 		if self.optional:
 			self.optvar = name
-	def call_decode(self, var):
-		return '1'
+	def call_decode(self, var, countvar = None):
+		if countvar is None:
+			countvar = 'NULL'
+		d = {'var':var, 'countvar':countvar}
+		return self.dfunc%d
 	def call_free(self, f, indent = 1):
 		tabs = ''.join('\t' for i in xrange(indent))
 		if self.need_free:
@@ -91,7 +110,10 @@ class CStructBase:
 		self.free_func = '_free_%s'%(self.name)
 		self.decode_func = '_%s'%(self.name)
 		self.optional = optional
-	
+
+	def set_count_var(self, cname):
+		self.count_var = cname
+
 	def set_cname(self, name):
 		self.cname = name
 	def set_cppname(self, name):
@@ -174,7 +196,7 @@ class CStructBase:
 
 		self._sequences = filter(lambda x:isinstance(x, CStructPtr),
 					self._scab_tags)
-		for seq in self._sequences:
+		for seq in self._tags:
 			seq.set_count_var(self._name_count_var(seq))
 
 		utags = filter(lambda x:x.union, self._tags)
@@ -269,7 +291,7 @@ class CStructBase:
 		f.write('}\n')
 		f.write('\n')
 
-	def call_decode(self, var):
+	def call_decode(self, var, countvar = None):
 		return '_%s_decode(%s, ptr, tag.ber_len)'%(
 			self.name, var)
 
@@ -307,12 +329,17 @@ class CStructBase:
 		f.write('\t\tswitch(tag.ber_tag) {\n')
 		for x in self._tags:
 			f.write('\t\tcase %s:\n'%(x.cppname + CPP_TAG_SUFFIX))
+			cv = None
 			if isinstance(x, CStructPtr):
-				var = '&%s->%s[%s]'%(self.name, x.name,
+				var = '&%s[%s]'%(x.cname,
 							x.count_var)
+			elif isinstance(x, CScalar) and x.array_sz:
+				if x.constraint[0] != x.constraint[1]:
+					cv = '&' + x.count_var
+				var = '%s'%x.cname
 			else:
-				var = '&%s->%s'%(self.name, x.name)
-			f.write('\t\t\tif ( !%s )\n'%x.call_decode(var))
+				var = '&%s'%x.cname
+			f.write('\t\t\tif ( !%s )\n'%x.call_decode(var, cv))
 			f.write('\t\t\t\treturn 0;')
 			f.write('\n')
 			if isinstance(x, CStructPtr):
@@ -395,9 +422,6 @@ class CStructPtr(CStructBase):
 	def call_free(self, f, indent = 1):
 		tabs = ''.join('\t' for i in xrange(indent))
 		f.write(tabs + '%s(&%s[i]);\n'%(self.free_func, self.cname))
-
-	def set_count_var(self, cname):
-		self.count_var = cname
 
 	def __init__(self, node):
 		assert(isinstance(node, Template))
