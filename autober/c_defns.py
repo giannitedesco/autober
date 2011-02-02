@@ -320,6 +320,18 @@ class CStructBase:
 		f.write('\t}\n')
 		f.write('\n')
 
+		i = 0
+		for x in self._tags:
+			if not isinstance(x, CStructPtr):
+				i += 1
+				continue
+			f.write('\t%s = calloc(cons[%d].count, '
+				'sizeof(*%s));\n'%(x.cname, i, x.cname))
+			f.write('\tif ( NULL == %s )\n'%x.cname)
+			f.write('\t\treturn 0;\n')
+			f.write('\n')
+			i += 1
+
 		f.write('\tfor(end = ptr + len; ptr < end; '
 			'ptr += tag.ber_len) {\n')
 		f.write('\t\tptr = ber_decode_tag(&tag, ptr, end - ptr);\n')
