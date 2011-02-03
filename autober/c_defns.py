@@ -525,4 +525,4 @@ class CDefinitions:
 
 	def __init__(self, root, modname):
 		self.root = CRoot(root, modname)
-		self.root.pretty_print()
+		#self.root.pretty_print()

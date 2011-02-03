@@ -12,7 +12,7 @@ if __name__ == '__main__':
 			parser = autober.parser(lex)
 			p = parser.parse_tree()
 			ast = autober.semantics(p)
-			ast.parse_tree.pretty_print()
+			#ast.parse_tree.pretty_print()
 		except autober.AutoberException, e:
 			print str(e)
 			ecode += 1
@@ -23,8 +23,10 @@ if __name__ == '__main__':
 		c_file = target.modname + ".c"
 		h = open(h_file, 'w')
 		#h = stdout
+		print 'Writing %s'%h.name
 		target.write_header(h)
 		c = open(c_file, 'w')
+		print 'Writing %s'%c.name
 		#c = stdout
 		target.include(h_file)
 		target.write_code(c)
